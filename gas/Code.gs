@@ -110,7 +110,7 @@ function submit_(d) {
       id, new Date(),
       clean_(d.guestName), txt_(d.mobile), clean_(d.email),
       num_(d.adults), num_(d.children), num_(d.vehicles),
-      clean_(d.checkInDate), clean_(d.checkInTime), clean_(d.checkOutDate), clean_(d.checkOutTime),
+      txt_(d.checkInDate), txt_(d.checkInTime), txt_(d.checkOutDate), txt_(d.checkOutTime),
       clean_(d.idType), txt_(d.idNumber), fileId,
       clean_(d.emergencyName), txt_(d.emergencyPhone),
       'Yes', 'Yes', 'Yes', 'Yes', 'Yes',

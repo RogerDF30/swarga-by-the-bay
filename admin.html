@@ -2,64 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b3d52">
 <title>Admin | Swarga by the Bay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
-<body class="admin">
-<header class="hero">
-  <h1>SWARGA BY THE BAY</h1>
-  <p>Guest Check-In Admin</p>
-</header>
+<body class="adm">
 
-<main style="max-width:1200px">
-  <!-- Login -->
-  <section id="loginView" class="card" style="max-width:420px;margin:40px auto">
-    <h2>Admin Login</h2>
-    <form id="loginForm">
-      <label>Username</label><input name="username" autocomplete="username" required>
-      <label style="margin-top:12px">Password</label><input name="password" type="password" autocomplete="current-password" required>
-      <div id="loginMsg" class="msg" role="alert"></div>
-      <p><button type="submit" id="loginBtn">Log in</button></p>
+<!-- ============ LOGIN ============ -->
+<section id="loginView" class="welcome">
+  <div class="sky"><div class="sun"></div><div class="bird b1"></div></div>
+  <div class="login-wrap">
+    <p class="eyebrow">Management</p>
+    <h1 class="login-title">Swarga <span>by the Bay</span></h1>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <h2>Welcome back</h2>
+      <p class="fine">Sign in to view guest check-ins.</p>
+      <div class="field"><input id="username" name="username" autocomplete="username" required placeholder=" "><label for="username">Username</label></div>
+      <div class="field pw"><input id="password" name="password" type="password" autocomplete="current-password" required placeholder=" "><label for="password">Password</label><button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password">Show</button></div>
+      <button type="submit" class="btn btn-sun wide" id="loginBtn">Sign in</button>
     </form>
-  </section>
+  </div>
+  <svg class="waves" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+    <path class="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,220 L0,220 Z"/>
+    <path class="w2" d="M0,150 C240,110 480,190 720,150 C960,110 1200,180 1440,140 L1440,220 L0,220 Z"/>
+    <path class="w3" d="M0,180 C300,160 520,210 760,185 C1000,160 1240,205 1440,180 L1440,220 L0,220 Z"/>
+  </svg>
+</section>
 
-  <!-- List -->
-  <section id="listView" class="hidden">
-    <div class="toolbar">
-      <input id="search" placeholder="Search name, mobile, ID, reference">
-      <select id="statusFilter" style="width:auto">
-        <option value="">All statuses</option><option>Pending</option><option>Verified</option>
-      </select>
-      <button id="refreshBtn" class="ghost" type="button">Refresh</button>
-      <button id="csvBtn" class="ghost" type="button">Export CSV</button>
-      <button id="logoutBtn" type="button">Log out</button>
+<!-- ============ DASHBOARD ============ -->
+<div id="listView" class="dash hidden">
+  <header class="dash-hero">
+    <div class="dash-top">
+      <div class="brand-mini light">Swarga <em>by the Bay</em></div>
+      <div class="dash-actions">
+        <button type="button" class="chip-btn" id="refreshBtn" title="Refresh">↻ Refresh</button>
+        <button type="button" class="chip-btn" id="logoutBtn">Sign out</button>
+      </div>
     </div>
-    <p id="count" style="color:var(--muted);margin:0 0 8px"></p>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Reference</th><th>Submitted</th><th>Guest</th><th>Mobile</th><th>Guests</th><th>Check-in</th><th>Check-out</th><th>Status</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <p class="eyebrow" id="greetDate"></p>
+    <h1>Guest check-ins</h1>
+    <div class="stats">
+      <div class="stat"><small>Total</small><strong id="stTotal">0</strong></div>
+      <div class="stat"><small>Arriving today</small><strong id="stToday">0</strong></div>
+      <div class="stat"><small>In house</small><strong id="stHouse">0</strong></div>
+      <div class="stat warn"><small>Pending verification</small><strong id="stPending">0</strong></div>
     </div>
-  </section>
-</main>
+  </header>
 
-<dialog id="detail">
-  <div class="dlg-head"><strong id="dlgTitle"></strong><button type="button" class="ghost" style="color:#fff;border-color:#fff" id="closeDlg">Close</button></div>
-  <div class="dlg-body">
-    <dl id="dlgFields"></dl>
-    <h3>ID Proof</h3>
-    <div id="idProof"><button type="button" class="ghost" id="loadPhoto">View ID proof</button></div>
-    <h3>Property Representative</h3>
-    <div id="verifyBlock">
-      <label>Representative Name</label><input id="repName" maxlength="120">
-      <div id="verifyMsg" class="msg" role="alert"></div>
-      <p><button type="button" id="verifyBtn">Mark as Verified</button></p>
+  <main class="dash-body">
+    <div class="toolbar2">
+      <div class="search"><span>🔍</span><input id="search" placeholder="Search name, mobile, ID or reference"></div>
+      <div class="seg" id="statusSeg" role="tablist">
+        <button type="button" class="on" data-s="">All</button>
+        <button type="button" data-s="Pending">Pending</button>
+        <button type="button" data-s="Verified">Verified</button>
+      </div>
+      <button type="button" class="chip-btn dark" id="csvBtn">⬇ Export CSV</button>
     </div>
+    <p id="count" class="fine"></p>
+    <div id="rows" class="guest-list"></div>
+    <div id="empty" class="empty hidden"><span>🏖️</span><p>No check-ins match.</p></div>
+  </main>
+</div>
+
+<!-- ============ DETAIL ============ -->
+<dialog id="detail" class="drawer">
+  <div class="drawer-head">
+    <div>
+      <p class="eyebrow" id="dlgRef"></p>
+      <h2 id="dlgTitle"></h2>
+      <span id="dlgBadge"></span>
+    </div>
+    <button type="button" class="icon-btn" id="closeDlg" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="ticket" id="dlgStay"></div>
+    <div id="dlgSections"></div>
+    <section class="dsec">
+      <h3>🪪 ID proof</h3>
+      <div id="idProof"></div>
+    </section>
+    <section class="dsec">
+      <h3>✍️ Property representative</h3>
+      <div id="verifyBlock"></div>
+    </section>
   </div>
 </dialog>
+
+<div id="msg" class="toast" role="alert"></div>
 
 <script src="assets/config.js"></script>
 <script src="assets/admin.js"></script>

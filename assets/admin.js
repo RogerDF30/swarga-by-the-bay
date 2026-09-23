@@ -1,12 +1,46 @@
 (function () {
   const API = window.SWARGA_CONFIG.API_URL;
-  const $ = (id) => document.getElementById(id);
-  let token = null;
-  let headers = [];
-  let rows = [];
-  let current = null;
+  const $ = (s) => document.querySelector(s);
+  let token = null, headers = [], rows = [], current = null, status = '';
 
   try { token = sessionStorage.getItem('sbb_token'); } catch (e) {}
+
+  /* ---------- helpers ---------- */
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const col = (r, name) => (r && r[headers.indexOf(name)]) || '';
+  const pad = (n) => String(n).padStart(2, '0');
+  // Accepts yyyy-mm-dd or m/d/yyyy (Sheets display format); returns yyyy-mm-dd or ''.
+  function isoDate(v) {
+    v = String(v || '').trim();
+    let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return m[1] + '-' + pad(m[2]) + '-' + pad(m[3]);
+    m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return m[3] + '-' + pad(m[1]) + '-' + pad(m[2]);
+    return '';
+  }
+  const todayIso = (() => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); })();
+  function niceDate(v) {
+    const i = isoDate(v);
+    if (!i) return v || '—';
+    const [y, mo, d] = i.split('-').map(Number);
+    return new Date(y, mo - 1, d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  function niceTime(v) {
+    const m = String(v || '').match(/(\d{1,2}):(\d{2})/);
+    if (!m) return v || '';
+    const h = +m[1];
+    return ((h % 12) || 12) + ':' + m[2] + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  const initials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+  let toastTimer;
+  function toast(text) {
+    const t = $('#msg');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  }
 
   async function call(action, extra) {
     const res = await fetch(API, {
@@ -14,18 +48,14 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({ action, token }, extra || {}))
     }).then(r => r.json());
-    if (!res.ok && res.error === 'AUTH') { logout(true); throw new Error('Session expired. Please log in again.'); }
+    if (!res.ok && res.error === 'AUTH') { logout(true); throw new Error('Session expired. Please sign in again.'); }
     if (!res.ok) throw new Error(res.error || 'Request failed.');
     return res;
   }
 
-  function msg(el, text, ok) { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
-  const col = (r, name) => r[headers.indexOf(name)] || '';
-  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
   function setView(loggedIn) {
-    $('loginView').classList.toggle('hidden', loggedIn);
-    $('listView').classList.toggle('hidden', !loggedIn);
+    $('#loginView').classList.toggle('hidden', loggedIn);
+    $('#listView').classList.toggle('hidden', !loggedIn);
   }
 
   function logout(silent) {
@@ -33,132 +63,188 @@
     token = null;
     try { sessionStorage.removeItem('sbb_token'); } catch (e) {}
     rows = [];
-    $('rows').innerHTML = '';
+    $('#rows').innerHTML = '';
     setView(false);
   }
 
-  /* ---- login ---- */
-  $('loginForm').addEventListener('submit', async (e) => {
+  /* ---------- login ---------- */
+  $('#pwToggle').addEventListener('click', () => {
+    const p = $('#password');
+    const show = p.type === 'password';
+    p.type = show ? 'text' : 'password';
+    $('#pwToggle').textContent = show ? 'Hide' : 'Show';
+  });
+
+  $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const f = e.target;
-    $('loginBtn').disabled = true;
+    const f = e.target, btn = $('#loginBtn');
+    if (!f.username.value.trim() || !f.password.value) return toast('Enter username and password.');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
     try {
-      const res = await call('login', { username: f.username.value, password: f.password.value });
+      const res = await call('login', { username: f.username.value.trim(), password: f.password.value });
       token = res.token;
       try { sessionStorage.setItem('sbb_token', token); } catch (e2) {}
       f.reset();
-      $('loginMsg').className = 'msg';
       setView(true);
       await load();
     } catch (err) {
-      msg($('loginMsg'), err.message);
+      toast(err.message);
+      f.classList.add('shake');
+      setTimeout(() => f.classList.remove('shake'), 400);
     } finally {
-      $('loginBtn').disabled = false;
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
     }
   });
 
-  /* ---- list ---- */
+  /* ---------- dashboard ---------- */
+  $('#greetDate').textContent = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
   async function load() {
-    $('count').textContent = 'Loading…';
+    $('#count').textContent = 'Loading…';
+    $('#rows').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
     const res = await call('list');
     headers = res.headers;
     rows = res.rows;
+    stats();
     render();
   }
 
+  function stats() {
+    let today = 0, house = 0, pending = 0;
+    rows.forEach(r => {
+      const a = isoDate(col(r, 'Check-in Date')), b = isoDate(col(r, 'Check-out Date'));
+      if (a === todayIso) today++;
+      if (a && b && a <= todayIso && todayIso <= b) house++;
+      if (col(r, 'Status') !== 'Verified') pending++;
+    });
+    $('#stTotal').textContent = rows.length;
+    $('#stToday').textContent = today;
+    $('#stHouse').textContent = house;
+    $('#stPending').textContent = pending;
+  }
+
   function filtered() {
-    const q = $('search').value.trim().toLowerCase();
-    const st = $('statusFilter').value;
-    return rows.filter(r => (!st || col(r, 'Status') === st) && (!q || r.join(' ').toLowerCase().includes(q)));
+    const q = $('#search').value.trim().toLowerCase();
+    return rows.filter(r => (!status || col(r, 'Status') === status) && (!q || r.join(' ').toLowerCase().includes(q)));
   }
 
   function render() {
     const list = filtered();
-    $('count').textContent = list.length + ' of ' + rows.length + ' check-ins';
-    $('rows').innerHTML = list.map(r => {
-      const guests = (Number(col(r, 'Adults')) || 0) + ' A / ' + (Number(col(r, 'Children')) || 0) + ' C';
-      const st = col(r, 'Status');
-      return '<tr class="row" data-id="' + esc(col(r, 'Submission ID')) + '">' +
-        '<td>' + esc(col(r, 'Submission ID')) + '</td>' +
-        '<td>' + esc(col(r, 'Submitted At')) + '</td>' +
-        '<td>' + esc(col(r, 'Guest Name')) + '</td>' +
-        '<td>' + esc(col(r, 'Mobile')) + '</td>' +
-        '<td>' + guests + '</td>' +
-        '<td>' + esc(col(r, 'Check-in Date') + ' ' + col(r, 'Check-in Time')) + '</td>' +
-        '<td>' + esc(col(r, 'Check-out Date') + ' ' + col(r, 'Check-out Time')) + '</td>' +
-        '<td><span class="badge ' + esc(st) + '">' + esc(st) + '</span></td></tr>';
+    $('#count').textContent = 'Showing ' + list.length + ' of ' + rows.length;
+    $('#empty').classList.toggle('hidden', list.length > 0);
+    $('#rows').innerHTML = list.map((r, i) => {
+      const st = col(r, 'Status') || 'Pending';
+      const a = +col(r, 'Adults') || 0, c = +col(r, 'Children') || 0;
+      return '<button type="button" class="guest" style="animation-delay:' + Math.min(i * 30, 400) + 'ms" data-id="' + esc(col(r, 'Submission ID')) + '">' +
+        '<span class="avatar">' + esc(initials(col(r, 'Guest Name'))) + '</span>' +
+        '<span class="g-main"><strong>' + esc(col(r, 'Guest Name')) + '</strong><small>' + esc(col(r, 'Submission ID')) + ' · ' + esc(col(r, 'Mobile')) + '</small></span>' +
+        '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + '</small></span>' +
+        '<span class="badge ' + esc(st) + '">' + esc(st) + '</span>' +
+        '</button>';
     }).join('');
   }
 
-  $('search').addEventListener('input', render);
-  $('statusFilter').addEventListener('change', render);
-  $('refreshBtn').addEventListener('click', () => load().catch(err => alertBox(err)));
-  $('logoutBtn').addEventListener('click', () => logout(false));
-  function alertBox(err) { $('count').textContent = err.message; }
+  $('#search').addEventListener('input', render);
+  $('#statusSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    status = b.dataset.s;
+    [...$('#statusSeg').children].forEach(x => x.classList.toggle('on', x === b));
+    render();
+  });
+  $('#refreshBtn').addEventListener('click', () => load().catch(err => toast(err.message)));
+  $('#logoutBtn').addEventListener('click', () => logout(false));
 
-  /* ---- detail ---- */
-  $('rows').addEventListener('click', (e) => {
-    const tr = e.target.closest('tr.row');
-    if (!tr) return;
-    current = rows.find(r => col(r, 'Submission ID') === tr.dataset.id);
-    const skip = ['ID Photo File ID', 'User Agent'];
-    $('dlgTitle').textContent = col(current, 'Guest Name') + ' · ' + col(current, 'Submission ID');
-    $('dlgFields').innerHTML = headers.map((h, i) => skip.includes(h) ? '' :
-      '<dt>' + esc(h) + '</dt><dd>' + esc(current[i] || '—') + '</dd>').join('');
-    $('idProof').innerHTML = col(current, 'ID Photo File ID')
-      ? '<button type="button" class="ghost" id="loadPhoto">View ID proof</button>'
-      : '<p style="color:var(--muted)">No file uploaded.</p>';
-    const verified = col(current, 'Status') === 'Verified';
-    $('verifyBlock').innerHTML = verified
-      ? '<p>Verified by <strong>' + esc(col(current, 'Rep Name')) + '</strong> on ' + esc(col(current, 'Rep Verified At')) + '</p>'
-      : '<label>Representative Name</label><input id="repName" maxlength="120"><div id="verifyMsg" class="msg" role="alert"></div><p><button type="button" id="verifyBtn">Mark as Verified</button></p>';
-    $('detail').showModal();
+  /* ---------- detail drawer ---------- */
+  const SECTIONS = [
+    ['👤 Guest', ['Guest Name', 'Mobile', 'Email', 'Adults', 'Children', 'Vehicles']],
+    ['🆘 Emergency contact', ['Emergency Contact Name', 'Emergency Contact No.']],
+    ['🪪 ID', ['ID Type', 'ID Number']],
+    ['✅ Acknowledgements', ['Ack House Rules', 'Ack Sea Safety', 'Ack Weather', 'Ack Liability', 'Ack Data Consent', 'Group Booking', 'Lead Guest Name', 'Declaration Name', 'Declaration Agreed', 'Submitted At']]
+  ];
+
+  $('#rows').addEventListener('click', (e) => {
+    const b = e.target.closest('.guest');
+    if (!b) return;
+    current = rows.find(r => col(r, 'Submission ID') === b.dataset.id);
+    openDetail();
   });
 
-  $('closeDlg').addEventListener('click', () => $('detail').close());
+  function openDetail() {
+    const st = col(current, 'Status') || 'Pending';
+    $('#dlgRef').textContent = col(current, 'Submission ID');
+    $('#dlgTitle').textContent = col(current, 'Guest Name');
+    $('#dlgBadge').className = 'badge ' + st;
+    $('#dlgBadge').textContent = st;
+    $('#dlgStay').innerHTML =
+      '<div><small>Check-in</small><strong>' + esc(niceDate(col(current, 'Check-in Date'))) + '</strong><small>' + esc(niceTime(col(current, 'Check-in Time'))) + '</small></div>' +
+      '<div class="ticket-sep">🌊</div>' +
+      '<div><small>Check-out</small><strong>' + esc(niceDate(col(current, 'Check-out Date'))) + '</strong><small>' + esc(niceTime(col(current, 'Check-out Time'))) + '</small></div>';
+    $('#dlgSections').innerHTML = SECTIONS.map(([title, keys]) =>
+      '<section class="dsec"><h3>' + title + '</h3><dl>' +
+      keys.filter(k => headers.includes(k) && (col(current, k) !== '' || k === 'Email'))
+        .map(k => '<dt>' + esc(k.replace(/^Ack /, '')) + '</dt><dd>' + esc(col(current, k) || '—') + '</dd>').join('') +
+      '</dl></section>').join('');
+    $('#idProof').innerHTML = col(current, 'ID Photo File ID')
+      ? '<button type="button" class="chip-btn dark" id="loadPhoto">View ID proof</button>'
+      : '<p class="fine">No file uploaded.</p>';
+    $('#verifyBlock').innerHTML = st === 'Verified'
+      ? '<p>Verified by <strong>' + esc(col(current, 'Rep Name')) + '</strong><br><span class="fine">' + esc(col(current, 'Rep Verified At')) + '</span></p>'
+      : '<div class="field"><input id="repName" maxlength="120" placeholder=" "><label for="repName">Representative name</label></div><button type="button" class="btn btn-sea wide" id="verifyBtn">Mark as verified</button>';
+    $('#detail').showModal();
+  }
 
-  $('detail').addEventListener('click', async (e) => {
+  $('#closeDlg').addEventListener('click', () => $('#detail').close());
+  $('#detail').addEventListener('click', async (e) => {
+    if (e.target === $('#detail')) return $('#detail').close(); // backdrop
     if (e.target.id === 'loadPhoto') {
       e.target.disabled = true;
       e.target.textContent = 'Loading…';
       try {
         const res = await call('photo', { id: col(current, 'Submission ID') });
         const p = res.photo;
-        if (!p) { $('idProof').textContent = 'No file uploaded.'; return; }
+        if (!p) { $('#idProof').innerHTML = '<p class="fine">No file uploaded.</p>'; return; }
         const src = 'data:' + p.mime + ';base64,' + p.data;
-        $('idProof').innerHTML = p.mime === 'application/pdf'
-          ? '<a download="' + esc(col(current, 'Submission ID')) + '.pdf" href="' + src + '">Download ID proof (PDF)</a>'
+        $('#idProof').innerHTML = p.mime === 'application/pdf'
+          ? '<a class="chip-btn dark" download="' + esc(col(current, 'Submission ID')) + '.pdf" href="' + src + '">⬇ Download ID proof (PDF)</a>'
           : '<img class="idimg" alt="ID proof" src="' + src + '">';
       } catch (err) {
-        $('idProof').textContent = err.message;
+        toast(err.message);
+        e.target.disabled = false;
+        e.target.textContent = 'View ID proof';
       }
     }
     if (e.target.id === 'verifyBtn') {
-      const name = $('repName').value.trim();
-      if (!name) return msg($('verifyMsg'), 'Enter the representative name.');
+      const name = $('#repName').value.trim();
+      if (!name) return toast('Enter the representative name.');
       e.target.disabled = true;
+      e.target.textContent = 'Saving…';
       try {
         await call('verify', { id: col(current, 'Submission ID'), repName: name });
-        $('detail').close();
+        $('#detail').close();
+        toast('Marked as verified.');
         await load();
       } catch (err) {
-        msg($('verifyMsg'), err.message);
+        toast(err.message);
         e.target.disabled = false;
+        e.target.textContent = 'Mark as verified';
       }
     }
   });
 
-  /* ---- CSV ---- */
-  $('csvBtn').addEventListener('click', () => {
+  /* ---------- CSV ---------- */
+  $('#csvBtn').addEventListener('click', () => {
     const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
     const csv = [headers].concat(filtered()).map(r => r.map(q).join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
-    a.download = 'swarga-checkins-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.download = 'swarga-checkins-' + todayIso + '.csv';
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
 
-  /* ---- init ---- */
-  if (token) { setView(true); load().catch(err => alertBox(err)); } else { setView(false); }
+  /* ---------- init ---------- */
+  if (token) { setView(true); load().catch(err => toast(err.message)); } else setView(false);
 })();
