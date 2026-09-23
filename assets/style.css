@@ -236,7 +236,7 @@ input, select, button { font: inherit; }
 .dash-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
 .brand-mini.light { color: #fff; }
 .dash-actions { display: flex; gap: 8px; }
-.dash-hero h1 { margin: 0 0 18px; font-size: clamp(1.8rem, 6vw, 2.6rem); }
+.dash-hero h1 { margin: 0 auto 18px; font-size: clamp(1.8rem, 6vw, 2.6rem); }
 .dash-hero .eyebrow { opacity: .8; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .stat { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); border-radius: 16px; padding: 12px 14px; }
