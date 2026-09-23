@@ -137,7 +137,7 @@
     $('#rows').innerHTML = list.map((r, i) => {
       const st = col(r, 'Status') || 'Pending';
       const a = +col(r, 'Adults') || 0, c = +col(r, 'Children') || 0;
-      return '<button type="button" class="guest" style="animation-delay:' + Math.min(i * 30, 400) + 'ms" data-id="' + esc(col(r, 'Submission ID')) + '">' +
+      return '<button type="button" class="gcard" style="animation-delay:' + Math.min(i * 30, 400) + 'ms" data-id="' + esc(col(r, 'Submission ID')) + '">' +
         '<span class="avatar">' + esc(initials(col(r, 'Guest Name'))) + '</span>' +
         '<span class="g-main"><strong>' + esc(col(r, 'Guest Name')) + '</strong><small>' + esc(col(r, 'Submission ID')) + ' · ' + esc(col(r, 'Mobile')) + '</small></span>' +
         '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + '</small></span>' +
@@ -166,7 +166,7 @@
   ];
 
   $('#rows').addEventListener('click', (e) => {
-    const b = e.target.closest('.guest');
+    const b = e.target.closest('.gcard');
     if (!b) return;
     current = rows.find(r => col(r, 'Submission ID') === b.dataset.id);
     openDetail();

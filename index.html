@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=4">
 </head>
-<body class="guest">
+<body class="guest-page">
 
 <!-- ============ WELCOME ============ -->
 <section id="welcome" class="welcome">
@@ -34,6 +34,22 @@
 
 <!-- ============ WIZARD ============ -->
 <div id="wizard" class="wizard hidden">
+  <aside class="side" aria-hidden="true">
+    <div class="side-inner">
+      <p class="eyebrow">Kodi Beach · Udupi</p>
+      <div class="side-brand">Swarga <em>by the Bay</em></div>
+      <ol class="side-steps" id="sideSteps"></ol>
+      <div class="side-times">
+        <div><small>Check-in</small><strong id="sideIn">1:00 PM</strong></div>
+        <div><small>Check-out</small><strong id="sideOut">11:00 AM</strong></div>
+      </div>
+    </div>
+    <svg class="side-waves" viewBox="0 0 1440 220" preserveAspectRatio="none">
+      <path class="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,220 L0,220 Z"/>
+      <path class="w2" d="M0,150 C240,110 480,190 720,150 C960,110 1200,180 1440,140 L1440,220 L0,220 Z"/>
+    </svg>
+  </aside>
+  <div class="pane">
   <header class="topbar">
     <button type="button" class="icon-btn" id="backBtn" aria-label="Back">←</button>
     <div class="brand-mini">Swarga <em>by the Bay</em></div>
@@ -271,6 +287,7 @@
     <span class="action-hint" id="actionHint"></span>
     <button type="button" class="btn btn-sea" id="nextBtn">Continue</button>
   </footer>
+  </div>
 </div>
 
 <!-- ============ DONE ============ -->
@@ -291,7 +308,7 @@
   </div>
 </section>
 
-<script src="assets/config.js"></script>
-<script src="assets/checkin.js"></script>
+<script src="assets/config.js?v=4"></script>
+<script src="assets/checkin.js?v=4"></script>
 </body>
 </html>

@@ -179,6 +179,17 @@
     if (b) go(+b.dataset.go, true);
   });
 
+  /* ---------- desktop side panel ---------- */
+  $('#sideSteps').innerHTML = steps.map((st, n) => '<li><span>' + (n + 1) + '</span>' + esc(st.dataset.title) + '</li>').join('');
+  $('#sideIn').textContent = fmtTime(CIN);
+  $('#sideOut').textContent = fmtTime(COUT);
+  function syncSide(i) {
+    $$('#sideSteps li').forEach((li, n) => {
+      li.classList.toggle('is-done', n < i);
+      li.classList.toggle('is-now', n === i);
+    });
+  }
+
   /* ---------- navigation ---------- */
   function go(i, backward) {
     $('#msg').classList.remove('show');
@@ -189,6 +200,7 @@
     s.classList.toggle('back', !!backward);
     $$('.rules li', s).forEach((li, n) => { li.style.animationDelay = Math.min(n * 40, 600) + 'ms'; });
     if (i === TOTAL - 1) renderSummary();
+    syncSide(i);
     $('#stepCount').textContent = (i + 1) + ' / ' + TOTAL;
     $('#progressFill').style.width = ((i + 1) / TOTAL * 100) + '%';
     $('#actionHint').textContent = s.dataset.title;
