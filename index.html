@@ -2,193 +2,294 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guest Check-In | Swarga by the Bay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d52">
+<title>Check-In | Swarga by the Bay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 </head>
-<body>
-<header class="hero">
-  <h1>SWARGA BY THE BAY</h1>
-  <p>Guest Check-In, House Rules &amp; Sea Safety Acceptance Form</p>
-  <p>Kodi Beach, Udupi District, Karnataka</p>
-</header>
+<body class="guest">
 
-<main>
-<form id="checkin" novalidate>
-
-<section class="card">
-  <p>Thank you for choosing Swarga by the Bay. Our property is located directly beside the sea and is designed as a peaceful beach home. For the safety, comfort and enjoyment of all our guests, please read and acknowledge the following guidelines.</p>
+<!-- ============ WELCOME ============ -->
+<section id="welcome" class="welcome">
+  <div class="sky">
+    <div class="sun"></div>
+    <div class="bird b1"></div><div class="bird b2"></div>
+  </div>
+  <div class="welcome-copy">
+    <p class="eyebrow">Kodi Beach · Udupi · Karnataka</p>
+    <h1>Swarga<br><span>by the Bay</span></h1>
+    <p class="lede">Welcome home. A quick check-in and you're on the sand.</p>
+    <button type="button" class="btn btn-sun" id="startBtn">Start check-in <span aria-hidden="true">→</span></button>
+    <p class="hint">About 4 minutes · Keep an ID proof handy</p>
+  </div>
+  <svg class="waves" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+    <path class="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,220 L0,220 Z"/>
+    <path class="w2" d="M0,150 C240,110 480,190 720,150 C960,110 1200,180 1440,140 L1440,220 L0,220 Z"/>
+    <path class="w3" d="M0,180 C300,160 520,210 760,185 C1000,160 1240,205 1440,180 L1440,220 L0,220 Z"/>
+  </svg>
 </section>
 
-<!-- 1. GUEST DETAILS -->
-<section class="card">
-  <h2>1. Guest Details</h2>
-  <div class="grid">
-    <div class="full"><label>Guest Name <span class="req">*</span></label><input name="guestName" required maxlength="120" autocomplete="name"></div>
-    <div><label>Mobile No. <span class="req">*</span></label><input name="mobile" type="tel" required pattern="\+?[0-9 ]{8,16}" title="Digits only, optional + country code" autocomplete="tel"></div>
-    <div><label>Email</label><input name="email" type="email" autocomplete="email"></div>
-    <div><label>Adults <span class="req">*</span></label><input name="adults" type="number" min="1" max="50" required></div>
-    <div><label>Children</label><input name="children" type="number" min="0" max="50" value="0"></div>
-    <div><label>Number of Vehicles</label><input name="vehicles" type="number" min="0" max="20" value="0"></div>
-    <div></div>
-    <div><label>Check-in Date <span class="req">*</span></label><input name="checkInDate" type="date" required></div>
-    <div><label>Check-in Time</label><input name="checkInTime" type="time"></div>
-    <div><label>Check-out Date <span class="req">*</span></label><input name="checkOutDate" type="date" required></div>
-    <div><label>Check-out Time</label><input name="checkOutTime" type="time"></div>
-    <div><label>ID Proof Type <span class="req">*</span></label>
-      <select name="idType" required>
-        <option value="">Select</option>
-        <option>Aadhaar</option><option>Passport</option><option>Driving Licence</option>
-        <option>Voter ID</option><option>PAN</option><option>Other</option>
-      </select></div>
-    <div><label>ID Proof No. <span class="req">*</span></label><input name="idNumber" required maxlength="40"></div>
-    <div class="full"><label>ID Proof Photo (JPG, PNG or PDF, max 5 MB)</label><input name="idPhoto" type="file" accept="image/jpeg,image/png,application/pdf" capture="environment"></div>
-    <div><label>Emergency Contact Name <span class="req">*</span></label><input name="emergencyName" required maxlength="120"></div>
-    <div><label>Emergency Contact No. <span class="req">*</span></label><input name="emergencyPhone" type="tel" required pattern="\+?[0-9 ]{8,16}" title="Digits only, optional + country code"></div>
+<!-- ============ WIZARD ============ -->
+<div id="wizard" class="wizard hidden">
+  <header class="topbar">
+    <button type="button" class="icon-btn" id="backBtn" aria-label="Back">←</button>
+    <div class="brand-mini">Swarga <em>by the Bay</em></div>
+    <span class="step-count" id="stepCount"></span>
+  </header>
+  <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+
+  <form id="checkin" novalidate>
+
+  <!-- STEP 1: STAY -->
+  <section class="step" data-step="1" data-title="Your stay">
+    <p class="kicker">Step 1</p>
+    <h2>Let's plan your stay</h2>
+
+    <div class="stay-card">
+      <div class="stay-col">
+        <label for="checkInDate">Check-in</label>
+        <input id="checkInDate" name="checkInDate" type="date" required>
+        <button type="button" class="time-chip" data-time="checkInTime"><span>🕐</span> <b id="checkInTimeLabel">1:00 PM</b></button>
+        <input name="checkInTime" type="time" class="time-edit hidden">
+      </div>
+      <div class="stay-mid"><span id="nights">1 night</span></div>
+      <div class="stay-col">
+        <label for="checkOutDate">Check-out</label>
+        <input id="checkOutDate" name="checkOutDate" type="date" required>
+        <button type="button" class="time-chip" data-time="checkOutTime"><span>🕚</span> <b id="checkOutTimeLabel">11:00 AM</b></button>
+        <input name="checkOutTime" type="time" class="time-edit hidden">
+      </div>
+    </div>
+    <p class="fine">Standard times are pre-filled. Tap a time only if the caretaker has approved a change.</p>
+
+    <h3>Who's coming?</h3>
+    <div class="stepper-list">
+      <div class="stepper-row">
+        <div><strong>Adults</strong><small>Age 18+</small></div>
+        <div class="stepper" data-name="adults" data-min="1" data-max="50"><button type="button" data-d="-1" aria-label="Fewer adults">−</button><output>2</output><button type="button" data-d="1" aria-label="More adults">+</button></div>
+        <input type="hidden" name="adults" value="2">
+      </div>
+      <div class="stepper-row">
+        <div><strong>Children</strong><small>Under 18</small></div>
+        <div class="stepper" data-name="children" data-min="0" data-max="50"><button type="button" data-d="-1" aria-label="Fewer children">−</button><output>0</output><button type="button" data-d="1" aria-label="More children">+</button></div>
+        <input type="hidden" name="children" value="0">
+      </div>
+      <div class="stepper-row">
+        <div><strong>Vehicles</strong><small>Parked at the property</small></div>
+        <div class="stepper" data-name="vehicles" data-min="0" data-max="20"><button type="button" data-d="-1" aria-label="Fewer vehicles">−</button><output>0</output><button type="button" data-d="1" aria-label="More vehicles">+</button></div>
+        <input type="hidden" name="vehicles" value="0">
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: YOU -->
+  <section class="step" data-step="2" data-title="About you">
+    <p class="kicker">Step 2</p>
+    <h2>A little about you</h2>
+    <div class="field"><input id="guestName" name="guestName" required maxlength="120" autocomplete="name" placeholder=" "><label for="guestName">Full name</label></div>
+    <div class="field"><input id="mobile" name="mobile" type="tel" required pattern="\+?[0-9 ]{8,16}" autocomplete="tel" inputmode="tel" placeholder=" "><label for="mobile">Mobile number</label></div>
+    <div class="field"><input id="email" name="email" type="email" autocomplete="email" placeholder=" "><label for="email">Email (optional)</label></div>
+    <h3>Emergency contact</h3>
+    <p class="fine">Someone we can call if we can't reach you.</p>
+    <div class="field"><input id="emergencyName" name="emergencyName" required maxlength="120" placeholder=" "><label for="emergencyName">Contact name</label></div>
+    <div class="field"><input id="emergencyPhone" name="emergencyPhone" type="tel" required pattern="\+?[0-9 ]{8,16}" inputmode="tel" placeholder=" "><label for="emergencyPhone">Contact number</label></div>
+  </section>
+
+  <!-- STEP 3: ID -->
+  <section class="step" data-step="3" data-title="ID proof">
+    <p class="kicker">Step 3</p>
+    <h2>Verify your ID</h2>
+    <p class="fine">Required for guest registration. Stored privately and visible only to management.</p>
+    <div class="chips" role="radiogroup" aria-label="ID type">
+      <label class="chip"><input type="radio" name="idType" value="Aadhaar" required><span>Aadhaar</span></label>
+      <label class="chip"><input type="radio" name="idType" value="Passport"><span>Passport</span></label>
+      <label class="chip"><input type="radio" name="idType" value="Driving Licence"><span>Driving Licence</span></label>
+      <label class="chip"><input type="radio" name="idType" value="Voter ID"><span>Voter ID</span></label>
+      <label class="chip"><input type="radio" name="idType" value="PAN"><span>PAN</span></label>
+      <label class="chip"><input type="radio" name="idType" value="Other"><span>Other</span></label>
+    </div>
+    <div class="field"><input id="idNumber" name="idNumber" required maxlength="40" placeholder=" " autocomplete="off"><label for="idNumber">ID number</label></div>
+    <label class="dropzone" id="dropzone">
+      <input name="idPhoto" type="file" accept="image/jpeg,image/png,application/pdf">
+      <div class="dz-empty">
+        <span class="dz-icon">📷</span>
+        <strong>Add a photo of your ID</strong>
+        <small>Take a picture or upload · JPG, PNG or PDF · max 5 MB</small>
+      </div>
+      <div class="dz-preview hidden"><img alt="ID preview"><span class="dz-name"></span><span class="dz-change">Change</span></div>
+    </label>
+  </section>
+
+  <!-- STEP 4: HOUSE RULES -->
+  <section class="step" data-step="4" data-title="House rules">
+    <p class="kicker">Step 4</p>
+    <h2>House rules</h2>
+    <p class="fine">So everyone enjoys a peaceful beach home.</p>
+    <ol class="rules">
+      <li><i>🕐</i>Check-in and check-out times must be followed unless prior permission is obtained.</li>
+      <li><i>👥</i>The property is provided for the number of guests declared at the time of booking. Additional guests require prior approval.</li>
+      <li><i>✨</i>Guests are requested to maintain cleanliness and take care of the property, furniture, appliances and other facilities.</li>
+      <li><i>🔧</i>Any damage, breakage or loss caused by a guest will be chargeable.</li>
+      <li><i>💡</i>Please switch off lights, air conditioners, fans and electrical appliances when not required.</li>
+      <li><i>🚭</i>Smoking is not permitted inside rooms or enclosed areas. Cigarette butts must not be discarded on the beach or property.</li>
+      <li><i>🍷</i>Alcohol consumption, where permitted by law, must be responsible and must not disturb other guests or neighbours.</li>
+      <li><i>🔇</i>Loud music, parties, shouting or activities disturbing neighbours or other guests are not permitted.</li>
+      <li><i>⛔</i>Illegal activities, possession or use of prohibited substances, weapons or other unlawful activities are strictly prohibited.</li>
+      <li><i>🎒</i>Guests are responsible for their personal belongings. The management is not responsible for loss or damage to valuables left unattended.</li>
+      <li><i>🧒</i>Children must be supervised by their parents/guardians at all times, particularly around the beach, balconies, stairs and water.</li>
+      <li><i>🐾</i>Pets are allowed only with prior approval and must be supervised by their owners. Pet owners are responsible for cleaning up after their pets.</li>
+      <li><i>🍳</i>Cooking, where kitchen facilities are provided, must be done safely. Gas/electrical appliances must be switched off after use.</li>
+      <li><i>🪑</i>Do not move furniture or outdoor equipment to the beach without permission.</li>
+      <li><i>🏖️</i>Please do not take property items, towels, furniture or equipment onto the sea or beach unless specifically permitted.</li>
+    </ol>
+    <label class="agree"><input type="checkbox" name="ackHouse" required><span class="tick"></span><span>I/We have read and agree to the House Rules.</span></label>
+  </section>
+
+  <!-- STEP 5: SEA SAFETY -->
+  <section class="step" data-step="5" data-title="Sea safety">
+    <p class="kicker">Step 5</p>
+    <h2>The sea, safely</h2>
+    <div class="alert">
+      <strong>🌊 Important</strong>
+      Swarga by the Bay is a beachfront property. The sea is a natural environment and conditions can change rapidly. Guests acknowledge that entering the sea is at their own risk.
+    </div>
+    <ol class="rules">
+      <li><i>🌀</i>There may be strong currents, waves, sudden changes in water depth and underwater hazards.</li>
+      <li><i>⛈️</i>Swimming or entering the sea should be avoided during rough weather, heavy rain, storms, high waves or strong currents.</li>
+      <li><i>🚫</i>Do not enter the sea after consuming alcohol or any substance that may impair judgment or coordination.</li>
+      <li><i>🧒</i>Children must never enter the sea or play near the water without direct adult supervision.</li>
+      <li><i>🤝</i>Never swim alone. Stay within your ability and remain close to shore.</li>
+      <li><i>🪨</i>Do not venture into deeper water, rocks, fishing areas or restricted areas.</li>
+      <li><i>🆘</i>Do not attempt to rescue another person from the sea by entering the water unless you are trained to do so. Call for professional assistance immediately.</li>
+      <li><i>📢</i>Guests should follow warnings from local authorities, lifeguards or property staff regarding sea conditions.</li>
+      <li><i>🏄</i>Beach toys, bodyboards, life jackets or other equipment provided by the property must be used responsibly and only for their intended purpose.</li>
+      <li><i>🦺</i>Life jackets are not a substitute for supervision or swimming ability.</li>
+      <li><i>↩️</i>Equipment must be returned after use and any damage must be reported immediately.</li>
+      <li><i>⚡</i>Avoid the sea during lightning, thunderstorms or other dangerous weather conditions.</li>
+      <li><i>🌙</i>At night, guests are advised not to enter the sea, as visibility and awareness of currents and hazards are significantly reduced.</li>
+      <li><i>🍽️</i>Do not consume food or alcohol while swimming or engaging in water activities.</li>
+      <li><i>🐚</i>Please be alert for sharp objects, shells, rocks, fishing equipment and other hazards on the beach.</li>
+      <li><i>🐢</i>The beach is a natural environment. Guests should not disturb marine life or remove shells, creatures or other natural material.</li>
+    </ol>
+    <label class="agree"><input type="checkbox" name="ackSea" required><span class="tick"></span><span>I/We have read and understood the Beach &amp; Sea Safety guidelines and accept that entering the sea is at my/our own risk.</span></label>
+  </section>
+
+  <!-- STEP 6: GOOD TO KNOW -->
+  <section class="step" data-step="6" data-title="Good to know">
+    <p class="kicker">Step 6</p>
+    <h2>Good to know</h2>
+
+    <details class="acc" open>
+      <summary>🚨 Emergency &amp; safety</summary>
+      <p>In case of an emergency:</p>
+      <ul>
+        <li>Immediately inform the property caretaker/management.</li>
+        <li>Call <a href="tel:112"><strong>112</strong></a> for emergency assistance where required.</li>
+        <li>For a medical emergency, seek professional medical assistance immediately.</li>
+        <li>In case of a fire, evacuate the building and inform the caretaker/management immediately.</li>
+        <li>Do not attempt to handle dangerous electrical, gas or fire-related situations unless you are trained to do so.</li>
+      </ul>
+      <div class="contacts">
+        <div><small>Property emergency</small><span id="cfgEmergency">—</span></div>
+        <div><small>Caretaker</small><span id="cfgCaretaker">—</span></div>
+        <div><small>Nearest hospital</small><span id="cfgHospital">—</span></div>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>🌦️ Weather &amp; natural conditions</summary>
+      <p>Guests acknowledge that beachfront properties are exposed to natural conditions including:</p>
+      <ul>
+        <li>Strong winds</li><li>Heavy rain and storms</li><li>High waves and strong currents</li>
+        <li>Lightning and thunderstorms</li><li>Temporary power or internet interruptions</li>
+        <li>Sand, salt and moisture</li><li>Insects and other natural wildlife</li>
+      </ul>
+      <p>Such natural conditions are beyond the reasonable control of the property management.</p>
+      <p>Management may restrict beach or sea access whenever conditions are considered unsafe.</p>
+    </details>
+
+    <details class="acc">
+      <summary>🌿 Respect for the property &amp; environment</summary>
+      <p>Guests are requested to:</p>
+      <ul>
+        <li>Keep the beach and property clean.</li>
+        <li>Use waste bins provided.</li>
+        <li>Avoid plastic or other waste entering the sea.</li>
+        <li>Respect local residents, fishermen and other beach users.</li>
+        <li>Avoid unnecessary disturbance to marine life.</li>
+        <li>Conserve water and electricity.</li>
+        <li>Report leaks, electrical problems or other safety concerns immediately.</li>
+      </ul>
+    </details>
+
+    <label class="agree"><input type="checkbox" name="ackWeather" required><span class="tick"></span><span>I/We acknowledge the Weather &amp; Natural Conditions.</span></label>
+  </section>
+
+  <!-- STEP 7: SIGN -->
+  <section class="step" data-step="7" data-title="Sign">
+    <p class="kicker">Last step</p>
+    <h2>Review &amp; sign</h2>
+
+    <div class="summary" id="summary"></div>
+
+    <details class="acc" open>
+      <summary>📜 Liability &amp; acknowledgement</summary>
+      <p>I/We confirm that I/we have read and understood the above house rules and sea-safety guidelines.</p>
+      <p>I/We understand that the property is located directly beside the sea and that the sea, beach, weather and surrounding natural environment involve inherent risks.</p>
+      <p>I/We agree to exercise reasonable care and accept responsibility for our own safety and the safety of children/minors under our supervision.</p>
+      <p>I/We understand that parents/guardians remain responsible for children and that the property staff cannot provide continuous supervision of guests or children.</p>
+      <p>I/We agree to follow instructions given by the property management/caretaker concerning safety, weather conditions and access to the beach or sea.</p>
+      <p>I/We further agree to compensate the property for any damage caused by me/us through negligence, misuse or violation of the house rules.</p>
+    </details>
+    <label class="agree"><input type="checkbox" name="ackLiability" required><span class="tick"></span><span>I/We accept the Liability &amp; Acknowledgement above.</span></label>
+
+    <label class="agree"><input type="checkbox" name="groupBooking" id="groupBooking"><span class="tick"></span><span>This is a group booking.</span></label>
+    <div id="groupBlock" class="indent hidden">
+      <p class="fine">I confirm that I have communicated the relevant house rules and sea-safety instructions to all members of my group.</p>
+      <div class="field"><input id="leadGuestName" name="leadGuestName" maxlength="120" placeholder=" "><label for="leadGuestName">Lead guest name</label></div>
+    </div>
+
+    <label class="agree"><input type="checkbox" name="ackData" required><span class="tick"></span><span>I consent to Swarga by the Bay storing the details and ID proof above for guest registration and safety purposes during and after my stay.</span></label>
+
+    <h3>Your signature</h3>
+    <div class="sig-pad">
+      <input id="declarationName" name="declarationName" required maxlength="120" placeholder="Type your full name" autocomplete="name">
+      <div class="sig-render" id="sigRender" aria-hidden="true"></div>
+      <div class="sig-line"><span>Signed</span><span id="sigDate"></span></div>
+    </div>
+    <label class="agree"><input type="checkbox" name="declarationAgreed" required><span class="tick"></span><span>I agree that typing my name above is my signature on this declaration. Date and time are recorded on submission.</span></label>
+  </section>
+
+  </form>
+
+  <div id="msg" class="toast" role="alert"></div>
+
+  <footer class="actionbar">
+    <span class="action-hint" id="actionHint"></span>
+    <button type="button" class="btn btn-sea" id="nextBtn">Continue</button>
+  </footer>
+</div>
+
+<!-- ============ DONE ============ -->
+<section id="done" class="done hidden">
+  <div class="done-card">
+    <div class="done-badge">✓</div>
+    <p class="eyebrow">You're checked in</p>
+    <h2>Welcome to Swarga, <span id="doneName"></span></h2>
+    <div class="ticket">
+      <div><small>Check-in</small><strong id="doneIn"></strong></div>
+      <div class="ticket-sep">🌊</div>
+      <div><small>Check-out</small><strong id="doneOut"></strong></div>
+    </div>
+    <p class="ref">Reference <strong id="refId"></strong></p>
+    <p class="fine">Show this reference to the caretaker.</p>
+    <p class="reminder">The sea is beautiful but unpredictable.<br>Please enjoy it responsibly and never compromise on safety.</p>
+    <p class="fine">Management – Swarga by the Bay</p>
   </div>
 </section>
-
-<!-- 2. HOUSE RULES -->
-<section class="card">
-  <h2>2. House Rules</h2>
-  <strong>General</strong>
-  <ol>
-    <li>Check-in and check-out times must be followed unless prior permission is obtained.</li>
-    <li>The property is provided for the number of guests declared at the time of booking. Additional guests require prior approval.</li>
-    <li>Guests are requested to maintain cleanliness and take care of the property, furniture, appliances and other facilities.</li>
-    <li>Any damage, breakage or loss caused by a guest will be chargeable.</li>
-    <li>Please switch off lights, air conditioners, fans and electrical appliances when not required.</li>
-    <li>Smoking is not permitted inside rooms or enclosed areas. Cigarette butts must not be discarded on the beach or property.</li>
-    <li>Alcohol consumption, where permitted by law, must be responsible and must not disturb other guests or neighbours.</li>
-    <li>Loud music, parties, shouting or activities disturbing neighbours or other guests are not permitted.</li>
-    <li>Illegal activities, possession or use of prohibited substances, weapons or other unlawful activities are strictly prohibited.</li>
-    <li>Guests are responsible for their personal belongings. The management is not responsible for loss or damage to valuables left unattended.</li>
-    <li>Children must be supervised by their parents/guardians at all times, particularly around the beach, balconies, stairs and water.</li>
-    <li>Pets are allowed only with prior approval and must be supervised by their owners. Pet owners are responsible for cleaning up after their pets.</li>
-    <li>Cooking, where kitchen facilities are provided, must be done safely. Gas/electrical appliances must be switched off after use.</li>
-    <li>Do not move furniture or outdoor equipment to the beach without permission.</li>
-    <li>Please do not take property items, towels, furniture or equipment onto the sea or beach unless specifically permitted.</li>
-  </ol>
-  <label class="check"><input type="checkbox" name="ackHouse" required> I/We have read and agree to the House Rules.</label>
-</section>
-
-<!-- 3. BEACH & SEA SAFETY -->
-<section class="card">
-  <h2>3. Beach &amp; Sea Safety</h2>
-  <p class="note"><strong>IMPORTANT:</strong> Swarga by the Bay is a beachfront property. The sea is a natural environment and conditions can change rapidly. Guests acknowledge that entering the sea is at their own risk.</p>
-  <ol>
-    <li>There may be strong currents, waves, sudden changes in water depth and underwater hazards.</li>
-    <li>Swimming or entering the sea should be avoided during rough weather, heavy rain, storms, high waves or strong currents.</li>
-    <li>Do not enter the sea after consuming alcohol or any substance that may impair judgment or coordination.</li>
-    <li>Children must never enter the sea or play near the water without direct adult supervision.</li>
-    <li>Never swim alone. Stay within your ability and remain close to shore.</li>
-    <li>Do not venture into deeper water, rocks, fishing areas or restricted areas.</li>
-    <li>Do not attempt to rescue another person from the sea by entering the water unless you are trained to do so. Call for professional assistance immediately.</li>
-    <li>Guests should follow warnings from local authorities, lifeguards or property staff regarding sea conditions.</li>
-    <li>Beach toys, bodyboards, life jackets or other equipment provided by the property must be used responsibly and only for their intended purpose.</li>
-    <li>Life jackets are not a substitute for supervision or swimming ability.</li>
-    <li>Equipment must be returned after use and any damage must be reported immediately.</li>
-    <li>Avoid the sea during lightning, thunderstorms or other dangerous weather conditions.</li>
-    <li>At night, guests are advised not to enter the sea, as visibility and awareness of currents and hazards are significantly reduced.</li>
-    <li>Do not consume food or alcohol while swimming or engaging in water activities.</li>
-    <li>Please be alert for sharp objects, shells, rocks, fishing equipment and other hazards on the beach.</li>
-    <li>The beach is a natural environment. Guests should not disturb marine life or remove shells, creatures or other natural material.</li>
-  </ol>
-  <label class="check"><input type="checkbox" name="ackSea" required> I/We have read and understood the Beach &amp; Sea Safety guidelines and accept that entering the sea is at my/our own risk.</label>
-</section>
-
-<!-- 4. EMERGENCY & SAFETY -->
-<section class="card">
-  <h2>4. Emergency &amp; Safety</h2>
-  <p>In case of an emergency:</p>
-  <ul>
-    <li>Immediately inform the property caretaker/management.</li>
-    <li>Call <strong>112</strong> for emergency assistance where required.</li>
-    <li>For a medical emergency, seek professional medical assistance immediately.</li>
-    <li>In case of a fire, evacuate the building and inform the caretaker/management immediately.</li>
-    <li>Do not attempt to handle dangerous electrical, gas or fire-related situations unless you are trained to do so.</li>
-  </ul>
-  <dl>
-    <dt>Property Emergency Contact</dt><dd id="cfgEmergency">—</dd>
-    <dt>Caretaker Contact</dt><dd id="cfgCaretaker">—</dd>
-    <dt>Nearest Hospital/Medical Facility</dt><dd id="cfgHospital">—</dd>
-  </dl>
-</section>
-
-<!-- 5. WEATHER -->
-<section class="card">
-  <h2>5. Weather &amp; Natural Conditions</h2>
-  <p>Guests acknowledge that beachfront properties are exposed to natural conditions including:</p>
-  <ul>
-    <li>Strong winds</li><li>Heavy rain and storms</li><li>High waves and strong currents</li>
-    <li>Lightning and thunderstorms</li><li>Temporary power or internet interruptions</li>
-    <li>Sand, salt and moisture</li><li>Insects and other natural wildlife</li>
-  </ul>
-  <p>Such natural conditions are beyond the reasonable control of the property management.</p>
-  <p>Management may restrict beach or sea access whenever conditions are considered unsafe.</p>
-  <label class="check"><input type="checkbox" name="ackWeather" required> I/We acknowledge the Weather &amp; Natural Conditions.</label>
-</section>
-
-<!-- 6. RESPECT -->
-<section class="card">
-  <h2>6. Respect for the Property &amp; Environment</h2>
-  <p>Guests are requested to:</p>
-  <ul>
-    <li>Keep the beach and property clean.</li>
-    <li>Use waste bins provided.</li>
-    <li>Avoid plastic or other waste entering the sea.</li>
-    <li>Respect local residents, fishermen and other beach users.</li>
-    <li>Avoid unnecessary disturbance to marine life.</li>
-    <li>Conserve water and electricity.</li>
-    <li>Report leaks, electrical problems or other safety concerns immediately.</li>
-  </ul>
-</section>
-
-<!-- 7. LIABILITY -->
-<section class="card">
-  <h2>7. Liability &amp; Acknowledgement</h2>
-  <p>I/We confirm that I/we have read and understood the above house rules and sea-safety guidelines.</p>
-  <p>I/We understand that the property is located directly beside the sea and that the sea, beach, weather and surrounding natural environment involve inherent risks.</p>
-  <p>I/We agree to exercise reasonable care and accept responsibility for our own safety and the safety of children/minors under our supervision.</p>
-  <p>I/We understand that parents/guardians remain responsible for children and that the property staff cannot provide continuous supervision of guests or children.</p>
-  <p>I/We agree to follow instructions given by the property management/caretaker concerning safety, weather conditions and access to the beach or sea.</p>
-  <p>I/We further agree to compensate the property for any damage caused by me/us through negligence, misuse or violation of the house rules.</p>
-  <label class="check"><input type="checkbox" name="ackLiability" required> I/We accept the Liability &amp; Acknowledgement above.</label>
-</section>
-
-<!-- DECLARATION -->
-<section class="card">
-  <h2>Guest Declaration</h2>
-  <div class="grid">
-    <div class="full"><label>Type your full name as signature <span class="req">*</span></label><input name="declarationName" required maxlength="120"></div>
-  </div>
-  <label class="check"><input type="checkbox" name="groupBooking" id="groupBooking"> This is a group booking.</label>
-  <div id="groupBlock" class="hidden">
-    <p>I confirm that I have communicated the relevant house rules and sea-safety instructions to all members of my group.</p>
-    <label>Lead Guest Name <span class="req">*</span></label><input name="leadGuestName" maxlength="120">
-  </div>
-  <label class="check"><input type="checkbox" name="ackData" required> I consent to Swarga by the Bay storing the details and ID proof above for guest registration and safety purposes during and after my stay.</label>
-  <label class="check"><input type="checkbox" name="declarationAgreed" required> I agree that typing my name above is my signature on this declaration. Date and time are recorded on submission.</label>
-
-  <div id="msg" class="msg" role="alert"></div>
-  <p><button type="submit" id="submitBtn">Submit Check-In</button></p>
-</section>
-
-<section class="card reminder">
-  <p>THE SEA IS BEAUTIFUL BUT UNPREDICTABLE.<br>PLEASE ENJOY IT RESPONSIBLY AND NEVER COMPROMISE ON SAFETY.</p>
-  <p style="font-weight:400">Management – Swarga by the Bay</p>
-</section>
-
-</form>
-
-<section id="done" class="card hidden" style="text-align:center">
-  <h2>Check-in received</h2>
-  <p>Reference: <strong id="refId"></strong></p>
-  <p>Please show this reference to the caretaker. Enjoy your stay.</p>
-</section>
-</main>
-
-<footer>&copy; Swarga by the Bay</footer>
 
 <script src="assets/config.js"></script>
 <script src="assets/checkin.js"></script>
