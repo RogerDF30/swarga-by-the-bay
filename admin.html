@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=7">
 </head>
 <body class="adm">
 
@@ -47,22 +47,30 @@
     <p class="eyebrow" id="greetDate"></p>
     <h1>Guest check-ins</h1>
     <div class="stats">
-      <div class="stat"><small>Total</small><strong id="stTotal">0</strong></div>
-      <div class="stat"><small>Arriving today</small><strong id="stToday">0</strong></div>
-      <div class="stat"><small>In house</small><strong id="stHouse">0</strong></div>
-      <div class="stat warn"><small>Pending verification</small><strong id="stPending">0</strong></div>
+      <button type="button" class="stat" data-view="arrivals"><small>Arrivals due</small><strong id="stArr">0</strong></button>
+      <button type="button" class="stat" data-view="inhouse"><small>In house</small><strong id="stHouse">0</strong></button>
+      <button type="button" class="stat" data-view="departures"><small>Departures due</small><strong id="stDep">0</strong></button>
+      <button type="button" class="stat warn" data-view="unverified"><small>Pending verification</small><strong id="stPending">0</strong></button>
     </div>
   </header>
 
   <main class="dash-body">
     <div class="toolbar2">
-      <div class="search"><span>🔍</span><input id="search" placeholder="Search guests, mobile, ID"></div>
-      <div class="seg" id="statusSeg" role="tablist">
-        <button type="button" class="on" data-s="">All</button>
-        <button type="button" data-s="Pending">Pending</button>
-        <button type="button" data-s="Verified">Verified</button>
-      </div>
+      <div class="search"><span>🔍</span><input id="search" type="search" placeholder="Name, mobile, reference, ID or vehicle no."></div>
       <button type="button" class="chip-btn dark" id="csvBtn">⬇ Export CSV</button>
+    </div>
+    <div class="tabs" id="viewTabs" role="tablist">
+      <button type="button" data-view="arrivals">Arrivals</button>
+      <button type="button" data-view="inhouse">In house</button>
+      <button type="button" data-view="departures">Departures</button>
+      <button type="button" data-view="checkedout">Checked out</button>
+      <button type="button" data-view="unverified">Unverified</button>
+      <button type="button" data-view="all" class="on">All</button>
+    </div>
+    <div class="range">
+      <label>Stay dates from <input type="date" id="fromDate"></label>
+      <label>to <input type="date" id="toDate"></label>
+      <button type="button" class="link-btn" id="clearFilters">Clear</button>
     </div>
     <p id="count" class="fine"></p>
     <div id="rows" class="guest-list"></div>
@@ -82,6 +90,14 @@
   </div>
   <div class="drawer-body">
     <div class="ticket" id="dlgStay"></div>
+    <section class="dsec stay-sec">
+      <h3>🏠 Stay</h3>
+      <div id="stayBlock"></div>
+    </section>
+    <section class="dsec hidden" id="historySec">
+      <h3>↺ Previous stays</h3>
+      <div id="historyBlock"></div>
+    </section>
     <section class="dsec">
       <div class="dsec-head"><h3>🚗 Vehicles</h3><button type="button" class="link-btn" id="vehEdit">Edit</button></div>
       <div id="vehBlock"></div>
@@ -100,7 +116,7 @@
 
 <div id="msg" class="toast" role="alert"></div>
 
-<script src="assets/config.js?v=6"></script>
-<script src="assets/admin.js?v=6"></script>
+<script src="assets/config.js?v=7"></script>
+<script src="assets/admin.js?v=7"></script>
 </body>
 </html>

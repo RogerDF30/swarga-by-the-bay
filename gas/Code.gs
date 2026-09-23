@@ -22,7 +22,8 @@ const HEADERS = [
   'Group Booking', 'Lead Guest Name',
   'Declaration Name', 'Declaration Agreed',
   'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
-  'Vehicle Numbers'   // appended later; keep new columns at the end
+  'Vehicle Numbers',   // columns below were appended later; keep new columns at the end
+  'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By'
 ];
 
 /* ---------- one-time setup ---------- */
@@ -80,6 +81,7 @@ function doPost(e) {
       case 'photo':  requireAdmin_(body.token); return json_(photo_(body.id));
       case 'verify': requireAdmin_(body.token); return json_(verify_(body.id, body.repName));
       case 'vehicles': requireAdmin_(body.token); return json_(updateVehicles_(body.id, body.count, body.numbers));
+      case 'stay':   requireAdmin_(body.token); return json_(stay_(body.id, body.move, body.staff));
       default:       return json_({ ok: false, error: 'Unknown action' });
     }
   } catch (err) {
@@ -119,7 +121,8 @@ function submit_(d) {
       d.groupBooking ? 'Yes' : 'No', clean_(d.leadGuestName),
       clean_(d.declarationName), 'Yes',
       '', '', 'Pending', clean_(d.userAgent).slice(0, 200),
-      plates_(d.vehicleNumbers)
+      plates_(d.vehicleNumbers),
+      'Expected', '', '', '', ''
     ];
     sheet_().appendRow(row);
     return { ok: true, id: id };
@@ -193,6 +196,48 @@ function updateVehicles_(id, count, numbers) {
   sh.getRange(r, HEADERS.indexOf('Vehicles') + 1).setValue(Math.min(num_(count), 20));
   sh.getRange(r, HEADERS.indexOf('Vehicle Numbers') + 1).setValue(plates_(numbers));
   return { ok: true };
+}
+
+/**
+ * Stay lifecycle: Expected -> Checked in -> Checked out.
+ * move: 'in' | 'out' | 'undo'. Records actual time (IST) and staff name.
+ */
+function stay_(id, move, staff) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = sheet_();
+    const r = findRow_(id);
+    const c = (name) => HEADERS.indexOf(name) + 1;
+    const now = "'" + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd HH:mm');
+    const who = clean_(staff).slice(0, 80);
+    const status = String(sh.getRange(r, c('Stay Status')).getValue() || 'Expected');
+
+    if (move === 'in') {
+      if (!who) throw new Error('Staff name required.');
+      if (status !== 'Expected') throw new Error('Guest is already ' + status.toLowerCase() + '.');
+      sh.getRange(r, c('Stay Status'), 1, 3).setValues([['Checked in', now, who]]);
+    } else if (move === 'out') {
+      if (!who) throw new Error('Staff name required.');
+      if (status !== 'Checked in') throw new Error('Guest must be checked in first.');
+      sh.getRange(r, c('Stay Status')).setValue('Checked out');
+      sh.getRange(r, c('Actual Check-out'), 1, 2).setValues([[now, who]]);
+    } else if (move === 'undo') {
+      if (status === 'Checked out') {
+        sh.getRange(r, c('Stay Status')).setValue('Checked in');
+        sh.getRange(r, c('Actual Check-out'), 1, 2).setValues([['', '']]);
+      } else if (status === 'Checked in') {
+        sh.getRange(r, c('Stay Status'), 1, 3).setValues([['Expected', '', '']]);
+      } else {
+        throw new Error('Nothing to undo.');
+      }
+    } else {
+      throw new Error('Unknown move.');
+    }
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* ---------- helpers ---------- */
