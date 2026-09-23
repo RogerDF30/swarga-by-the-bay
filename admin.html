@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
 <body class="adm">
 
@@ -40,6 +40,7 @@
     <div class="dash-top">
       <div class="brand-mini light">Swarga <em>by the Bay</em></div>
       <div class="dash-actions">
+        <button type="button" class="me-chip" id="meChip" title="My account"></button>
         <button type="button" class="chip-btn" id="refreshBtn" title="Refresh">↻ Refresh</button>
         <button type="button" class="chip-btn" id="logoutBtn">Sign out</button>
       </div>
@@ -49,6 +50,7 @@
       <button type="button" data-sec="bookings" class="on">📅 Bookings</button>
       <button type="button" data-sec="log">📖 Guest log</button>
       <button type="button" data-sec="rooms">🛏️ Rooms</button>
+      <button type="button" data-sec="settings">⚙️ Settings</button>
     </nav>
     <div class="stats five">
       <button type="button" class="stat warn" data-go="bookings:requests"><small>New requests</small><strong id="stReq">0</strong></button>
@@ -130,6 +132,12 @@
       <div class="occ-legend"><span class="lg c-Confirmed"></span>Confirmed <span class="lg c-Checkedin"></span>In house <span class="lg c-Requested"></span>Request <span class="lg c-maint"></span>Maintenance</div>
       <div class="occ-wrap"><div id="occGrid" class="occ-grid"></div></div>
     </section>
+
+    <!-- SETTINGS -->
+    <section id="sec-settings" class="sec hidden">
+      <div class="tabs" id="sTabs"></div>
+      <div id="sBody" class="sbody"></div>
+    </section>
   </main>
 </div>
 
@@ -188,7 +196,7 @@
 
 <div id="msg" class="toast" role="alert"></div>
 
-<script src="assets/config.js?v=8"></script>
-<script src="assets/admin.js?v=8"></script>
+<script src="assets/config.js?v=9"></script>
+<script src="assets/admin.js?v=9"></script>
 </body>
 </html>

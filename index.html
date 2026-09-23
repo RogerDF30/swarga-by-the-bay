@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
 <body class="guest-page">
 
@@ -113,7 +113,7 @@
     <h2>A little about you</h2>
     <div class="field"><input id="guestName" name="guestName" required maxlength="120" autocomplete="name" placeholder=" "><label for="guestName">Full name</label></div>
     <div class="field"><input id="mobile" name="mobile" type="tel" required pattern="\+?[0-9 ]{8,16}" autocomplete="tel" inputmode="tel" placeholder=" "><label for="mobile">Mobile number</label></div>
-    <div class="field"><input id="email" name="email" type="email" autocomplete="email" placeholder=" "><label for="email">Email (optional)</label></div>
+    <div class="field"><input id="email" name="email" type="email" required maxlength="120" autocomplete="email" placeholder=" "><label for="email">Email (for your booking updates)</label></div>
     <h3>Emergency contact</h3>
     <p class="fine">Someone we can call if we can't reach you.</p>
     <div class="field"><input id="emergencyName" name="emergencyName" required maxlength="120" placeholder=" "><label for="emergencyName">Contact name</label></div>
@@ -314,7 +314,7 @@
   </div>
 </section>
 
-<script src="assets/config.js?v=8"></script>
-<script src="assets/checkin.js?v=8"></script>
+<script src="assets/config.js?v=9"></script>
+<script src="assets/checkin.js?v=9"></script>
 </body>
 </html>

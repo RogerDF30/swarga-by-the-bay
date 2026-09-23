@@ -92,7 +92,7 @@ function publicRooms_() {
   return { ok: true, rooms: rooms };
 }
 
-function saveRoom_(d, staff) {
+function saveRoom_(d, sess) {
   const name = clean_(d.name);
   if (!name) throw new Error('Room name is required.');
   const status = ['Active', 'Maintenance', 'Inactive'].indexOf(d.status) > -1 ? d.status : 'Active';
@@ -106,11 +106,13 @@ function saveRoom_(d, staff) {
     if (d.id) {
       const r = findBy_(ROOMS, ROOM_HEADERS, d.id);
       writeFields_(ROOMS, ROOM_HEADERS, r._row, fields);
+      audit_(sess, 'room.update', d.id, name + ' · ' + status);
       return { ok: true, id: d.id };
     }
     const id = 'R' + String(readAll_(ROOMS, ROOM_HEADERS).length + 1).padStart(2, '0') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
     fields['Room ID'] = id;
     appendObj_(ROOMS, ROOM_HEADERS, fields);
+    audit_(sess, 'room.create', id, name);
     return { ok: true, id: id };
   } finally { lock.releaseLock(); }
 }
@@ -161,6 +163,7 @@ function validateBookingInput_(d) {
 function requestBooking_(d) {
   if (d.website) return { ok: true, id: 'OK' }; // honeypot: bots fill hidden field
   validateBookingInput_(d);
+  if (!String(d.email || '').trim()) throw new Error('Email is required.');
   if (d.checkIn < todayIso_()) throw new Error('Check-in date is in the past.');
   const key = 'req_' + String(d.mobile).replace(/\D/g, '').slice(-10);
   const cache = CacheService.getScriptCache();
@@ -173,8 +176,9 @@ function requestBooking_(d) {
   const nights = nightsOf_(d.checkIn, d.checkOut);
   const charges = priceFor_(rooms, nights);
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let id;
   try {
-    const id = newId_('SBK');
+    id = newId_('SBK');
     appendObj_(BOOKINGS, BOOKING_HEADERS, {
       'Booking ID': id, 'Created At': stamp_(), 'Source': 'Website', 'Status': 'Requested',
       'Guest Name': clean_(d.guestName), 'Mobile': txt_(d.mobile), 'Email': clean_(d.email),
@@ -184,17 +188,22 @@ function requestBooking_(d) {
       'Paid': 0, 'Payment Status': 'Unpaid', 'Special Requests': clean_(d.requests),
       'Updated At': stamp_(), 'Updated By': 'Guest (website)'
     });
-    return { ok: true, id: id, total: charges, nights: nights };
   } finally { lock.releaseLock(); }
+  const b = findBy_(BOOKINGS, BOOKING_HEADERS, id);
+  notify_('requestReceived', b, { once: true });
+  notify_('staffNewRequest', b, { once: true });
+  return { ok: true, id: id, total: charges, nights: nights };
 }
 
 /** Admin create / edit. */
-function saveBooking_(d, staff) {
+function saveBooking_(d, sess) {
+  const staff = sess.name;
   validateBookingInput_(d);
   const status = BOOKING_STATUSES.indexOf(d.status) > -1 ? d.status : 'Confirmed';
   const rooms = roomList_(d.rooms);
   const nights = nightsOf_(d.checkIn, d.checkOut);
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let id = d.id;
   try {
     if (BLOCKING.indexOf(status) > -1) {
       const c = conflicts_(rooms, d.checkIn, d.checkOut, d.id || '');
@@ -212,7 +221,6 @@ function saveBooking_(d, staff) {
       'Special Requests': clean_(d.requests), 'Internal Notes': clean_(d.notes),
       'Updated At': stamp_(), 'Updated By': clean_(staff)
     };
-    let id = d.id;
     if (id) {
       const b = findBy_(BOOKINGS, BOOKING_HEADERS, id);
       writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, fields);
@@ -224,15 +232,18 @@ function saveBooking_(d, staff) {
       appendObj_(BOOKINGS, BOOKING_HEADERS, fields);
     }
     refreshPaid_(id);
-    return { ok: true, id: id };
+    audit_(sess, d.id ? 'booking.update' : 'booking.create', id, fields['Guest Name'] + ' · ' + fields['Check-in Date'] + ' → ' + fields['Check-out Date'] + ' · ' + status);
   } finally { lock.releaseLock(); }
+  if (!d.id && status === 'Confirmed' && d.notifyGuest !== false) notify_('bookingConfirmed', findBy_(BOOKINGS, BOOKING_HEADERS, id), { once: true });
+  return { ok: true, id: id };
 }
 
 /** Status moves from the Bookings screen. Keeps the linked guest-log row in sync. */
-function bookingStatus_(id, status, reason, staff) {
+function bookingStatus_(id, status, reason, sess, notifyGuest) {
+  const staff = sess.name;
   if (BOOKING_STATUSES.indexOf(status) === -1) throw new Error('Unknown status.');
-  if (!clean_(staff)) throw new Error('Staff name required.');
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let from;
   try {
     const b = findBy_(BOOKINGS, BOOKING_HEADERS, id);
     const rooms = roomList_(b['Room IDs']);
@@ -250,6 +261,7 @@ function bookingStatus_(id, status, reason, staff) {
       'Cancelled': ['Requested', 'Confirmed'],
       'No-show': ['Confirmed', 'Cancelled']
     };
+    from = b.Status;
     if ((ALLOWED[b.Status] || []).indexOf(status) === -1) throw new Error('Cannot move a ' + b.Status + ' booking to ' + status + '.');
     if ((status === 'Cancelled' || status === 'No-show') && !clean_(reason)) throw new Error('Please give a reason.');
     const fields = { 'Status': status, 'Updated At': stamp_(), 'Updated By': clean_(staff) };
@@ -261,8 +273,20 @@ function bookingStatus_(id, status, reason, staff) {
     if (ref && (status === 'Checked in' || status === 'Checked out' || status === 'Confirmed')) {
       syncStayFromBooking_(ref, status, staff);
     }
-    return { ok: true };
+    audit_(sess, 'booking.status', id, from + ' → ' + status + (reason ? ' · ' + clean_(reason) : ''));
   } finally { lock.releaseLock(); }
+  if (notifyGuest !== false) statusEmail_(id, from, status);
+  return { ok: true };
+}
+
+/** Guest email for a status change. Each template goes out at most once per booking. */
+function statusEmail_(id, from, status) {
+  const key = status === 'Confirmed' && ['Requested', 'Cancelled', 'No-show'].indexOf(from) > -1 ? 'bookingConfirmed'
+    : (status === 'Cancelled' || status === 'No-show') ? 'bookingCancelled'
+    : status === 'Checked out' ? 'thankYou' : '';
+  if (!key) return;
+  const b = readAll_(BOOKINGS, BOOKING_HEADERS).filter(x => x['Booking ID'] === id)[0];
+  if (b) notify_(key, b, { once: key !== 'bookingCancelled' });
 }
 
 function syncStayFromBooking_(submissionId, bookingStatus, staff) {
@@ -291,6 +315,7 @@ function syncBookingFromStay_(submissionId, stayStatus, staff) {
   const next = map[stayStatus];
   if (next && next !== b.Status) {
     writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, { 'Status': next, 'Updated At': stamp_(), 'Updated By': clean_(staff) });
+    if (next === 'Checked out') { b.Status = next; notify_('thankYou', b, { once: true }); }
   }
 }
 
@@ -312,38 +337,49 @@ function bookingForCheckin_(code) {
 }
 
 /** Link a guest-log submission to its booking (called from submit_). */
-function linkCheckin_(bookingId, submissionId) {
+function linkCheckin_(bookingId, submissionId, email) {
   const b = readAll_(BOOKINGS, BOOKING_HEADERS).filter(x => x['Booking ID'] === bookingId)[0];
-  if (!b) return false;
-  writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, { 'Check-in Ref': submissionId, 'Updated At': stamp_() });
-  return true;
+  if (!b) return null;
+  const fields = { 'Check-in Ref': submissionId, 'Updated At': stamp_() };
+  if (!b.Email && email) { fields.Email = email; b.Email = email; }
+  writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, fields);
+  b['Check-in Ref'] = submissionId;
+  return b;
 }
 
 /* ---------- payments ---------- */
 
-function addPayment_(d, staff) {
-  if (!clean_(staff)) throw new Error('Staff name required.');
+function addPayment_(d, sess) {
+  const staff = sess.name;
   const amount = money_(d.amount);
   if (!(amount > 0)) throw new Error('Enter an amount greater than 0.');
   const kind = d.kind === 'Refund' ? 'Refund' : 'Payment';
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let payId, res;
   try {
     findBy_(BOOKINGS, BOOKING_HEADERS, d.bookingId);
+    payId = newId_('PAY');
     appendObj_(PAYMENTS, PAYMENT_HEADERS, {
-      'Payment ID': newId_('PAY'), 'Booking ID': d.bookingId, 'Recorded At': stamp_(), 'Kind': kind,
+      'Payment ID': payId, 'Booking ID': d.bookingId, 'Recorded At': stamp_(), 'Kind': kind,
       'Amount': kind === 'Refund' ? -amount : amount, 'Mode': PAY_MODES.indexOf(d.mode) > -1 ? d.mode : 'Other',
       'Reference': clean_(d.reference), 'Note': clean_(d.note), 'Recorded By': clean_(staff)
     });
-    return Object.assign({ ok: true }, refreshPaid_(d.bookingId));
+    res = Object.assign({ ok: true }, refreshPaid_(d.bookingId));
+    audit_(sess, kind === 'Refund' ? 'payment.refund' : 'payment.add', d.bookingId, inr_(amount) + ' · ' + (PAY_MODES.indexOf(d.mode) > -1 ? d.mode : 'Other'));
   } finally { lock.releaseLock(); }
+  if (d.notifyGuest !== false) {
+    const p = readAll_(PAYMENTS, PAYMENT_HEADERS).filter(x => x['Payment ID'] === payId)[0];
+    if (p) notify_('paymentReceipt', findBy_(BOOKINGS, BOOKING_HEADERS, d.bookingId), { extra: paymentVars_(p) });
+  }
+  return res;
 }
 
 /** "Mark as paid": records the outstanding balance as one payment. */
-function markPaid_(d, staff) {
+function markPaid_(d, sess) {
   const b = findBy_(BOOKINGS, BOOKING_HEADERS, d.bookingId);
   const bal = money_(b.Total) - paidFor_(d.bookingId);
   if (bal <= 0) throw new Error('Nothing outstanding on this booking.');
-  return addPayment_({ bookingId: d.bookingId, amount: bal, mode: d.mode, reference: d.reference, note: 'Balance settled' }, staff);
+  return addPayment_({ bookingId: d.bookingId, amount: bal, mode: d.mode, reference: d.reference, note: 'Balance settled', notifyGuest: d.notifyGuest }, sess);
 }
 
 function paidFor_(bookingId) {

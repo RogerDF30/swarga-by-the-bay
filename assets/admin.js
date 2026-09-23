@@ -1,10 +1,11 @@
 (function () {
   const API = window.SWARGA_CONFIG.API_URL;
   const $ = (s) => document.querySelector(s);
-  let token = null, headers = [], rows = [], current = null, view = 'all';
+  let token = null, headers = [], rows = [], current = null, view = 'all', me = null;
   let db = { bookings: [], rooms: [], payments: [], options: { statuses: [], sources: [], modes: [] }, today: '' };
 
-  try { token = sessionStorage.getItem('sbb_token'); } catch (e) {}
+  try { token = sessionStorage.getItem('sbb_token'); me = JSON.parse(sessionStorage.getItem('sbb_user') || 'null'); } catch (e) {}
+  const isSuper = () => !!me && me.role === 'Super admin';
 
   /* ---------- helpers ---------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -62,8 +63,10 @@
   function logout(silent) {
     if (!silent && token) call('logout').catch(() => {});
     token = null;
-    try { sessionStorage.removeItem('sbb_token'); } catch (e) {}
-    rows = [];
+    try { sessionStorage.removeItem('sbb_token'); sessionStorage.removeItem('sbb_user'); } catch (e) {}
+    rows = []; me = null;
+    if ($('#panel').open) $('#panel').close();
+    if ($('#detail').open) $('#detail').close();
     $('#rows').innerHTML = '';
     setView(false);
   }
@@ -85,8 +88,10 @@
     try {
       const res = await call('login', { username: f.username.value.trim(), password: f.password.value });
       token = res.token;
+      setMe(res.user);
       try { sessionStorage.setItem('sbb_token', token); } catch (e2) {}
       f.reset();
+      showSection('bookings');
       setView(true);
       await load();
     } catch (err) {
@@ -106,6 +111,7 @@
     $('#count').textContent = 'Loading…';
     $('#rows').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
     const res = await call('data');
+    setMe(res.user);
     headers = res.log.headers;
     rows = res.log.rows;
     db = res;
@@ -232,14 +238,21 @@
       : '<p class="fine">No file uploaded.</p>';
     $('#verifyBlock').innerHTML = st === 'Verified'
       ? '<p>Verified by <strong>' + esc(col(current, 'Rep Name')) + '</strong><br><span class="fine">' + esc(col(current, 'Rep Verified At')) + '</span></p>'
-      : '<div class="field"><input id="repName" maxlength="120" placeholder=" "><label for="repName">Representative name</label></div><button type="button" class="btn btn-sea wide" id="verifyBtn">Mark as verified</button>';
+      : '<p class="fine">Recorded as <b>' + esc(staffName) + '</b> once you confirm the ID matches the guest.</p><button type="button" class="btn btn-sea wide" id="verifyBtn">Mark as verified</button>';
     if (!$('#detail').open) $('#detail').showModal();
     $('.drawer-body').scrollTop = 0;
   }
 
   /* ---------- stay actions ---------- */
-  let staffName = '';
-  try { staffName = sessionStorage.getItem('sbb_staff') || ''; } catch (e) {}
+  let staffName = me ? me.name : '';
+  function setMe(u) {
+    if (!u) return;
+    me = { username: u.username, name: u.name || u.username, role: u.role };
+    staffName = me.name;
+    try { sessionStorage.setItem('sbb_user', JSON.stringify(me)); } catch (e) {}
+    $('#meChip').innerHTML = '<span class="avatar sm">' + esc(initials(me.name)) + '</span><span>' + esc(me.name) + '<small>' + esc(me.role) + '</small></span>';
+    document.body.classList.toggle('is-super', isSuper());
+  }
   function renderStay() {
     const st = stayOf(current), fl = flag(current);
     const line = (label, at, by) => at ? '<dt>' + label + '</dt><dd>' + esc(at) + (by ? ' · ' + esc(by) : '') + '</dd>' : '';
@@ -248,8 +261,7 @@
       '<dl>' + line('Checked in', col(current, 'Actual Check-in'), col(current, 'Checked-in By')) +
       line('Checked out', col(current, 'Actual Check-out'), col(current, 'Checked-out By')) + '</dl>';
     if (st !== 'Checked out') {
-      html += '<div class="field"><input id="staffName" maxlength="80" placeholder=" " value="' + esc(staffName) + '"><label for="staffName">Staff name</label></div>' +
-        '<button type="button" class="btn ' + (st === 'Expected' ? 'btn-sun' : 'btn-sea') + ' wide" data-move="' + (st === 'Expected' ? 'in' : 'out') + '">' +
+      html += '<button type="button" class="btn ' + (st === 'Expected' ? 'btn-sun' : 'btn-sea') + ' wide" data-move="' + (st === 'Expected' ? 'in' : 'out') + '">' +
         (st === 'Expected' ? '🔑 Check in now' : '👋 Check out now') + '</button>';
     }
     if (st !== 'Expected') html += '<button type="button" class="link-btn undo" data-move="undo">Undo ' + (st === 'Checked out' ? 'check-out' : 'check-in') + '</button>';
@@ -264,15 +276,12 @@
   }
   async function doMove(btn) {
     const move = btn.dataset.move;
-    const input = $('#staffName');
-    const staff = input ? input.value.trim() : staffName;
-    if (move !== 'undo' && !staff) { toast('Enter the staff name.'); if (input) input.focus(); return; }
-    if (staff) { staffName = staff; try { sessionStorage.setItem('sbb_staff', staff); } catch (e) {} }
+    const staff = staffName;
     btn.disabled = true;
     const label = btn.textContent;
     btn.textContent = 'Saving…';
     try {
-      await call('stay', { id: col(current, 'Submission ID'), move, staff });
+      await call('stay', { id: col(current, 'Submission ID'), move });
       const set = (k, v) => { let i = headers.indexOf(k); if (i === -1) { headers.push(k); rows.forEach(r => r.push('')); i = headers.length - 1; } current[i] = v; };
       const st = stayOf(current);
       if (move === 'in') { set('Stay Status', 'Checked in'); set('Actual Check-in', nowStamp()); set('Checked-in By', staff); }
@@ -371,12 +380,10 @@
       return;
     }
     if (e.target.id === 'verifyBtn') {
-      const name = $('#repName').value.trim();
-      if (!name) return toast('Enter the representative name.');
       e.target.disabled = true;
       e.target.textContent = 'Saving…';
       try {
-        await call('verify', { id: col(current, 'Submission ID'), repName: name });
+        await call('verify', { id: col(current, 'Submission ID') });
         $('#detail').close();
         toast('Marked as verified.');
         await load();
@@ -439,7 +446,7 @@
   function showSection(sec) {
     section = sec;
     document.querySelectorAll('#secNav button').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
-    ['bookings', 'log', 'rooms'].forEach(k => $('#sec-' + k).classList.toggle('hidden', k !== sec));
+    ['bookings', 'log', 'rooms', 'settings'].forEach(k => $('#sec-' + k).classList.toggle('hidden', k !== sec));
   }
   $('#secNav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showSection(b.dataset.sec); });
   document.querySelectorAll('.stats .stat').forEach(b => b.addEventListener('click', () => {
@@ -535,14 +542,9 @@
   $('#panel').addEventListener('click', e => { if (e.target === $('#panel')) $('#panel').close(); });
   $('#panel').addEventListener('close', () => { openBookingId = ''; panelMode = ''; });
   const opts = (list, sel) => list.map(o => '<option' + (o === sel ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
-  const staffField = () => '<div class="field"><input id="pStaff" maxlength="80" placeholder=" " value="' + esc(staffName) + '"><label for="pStaff">Staff name</label></div>';
-  function takeStaff() {
-    const v = ($('#pStaff') || {}).value;
-    const s = String(v == null ? staffName : v).trim();
-    if (!s) { toast('Enter the staff name.'); if ($('#pStaff')) $('#pStaff').focus(); return null; }
-    staffName = s; try { sessionStorage.setItem('sbb_staff', s); } catch (e) {}
-    return s;
-  }
+  const staffField = () => '';
+  const takeStaff = () => staffName || 'staff';
+  const notifyOn = () => { const c = $('#pNotify'); return c ? c.checked : true; };
   async function busy(btn, fn) {
     const label = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
     try { await fn(); } catch (err) { toast(err.message); } finally { btn.disabled = false; btn.textContent = label; }
@@ -577,7 +579,7 @@
       '<div><small>Check-out</small><strong>' + esc(niceDate(b['Check-out Date'])) + '</strong><small>' + esc(niceTime(window.SWARGA_CONFIG.CHECKOUT_TIME || '11:00')) + '</small></div></div>' +
 
       '<section class="dsec"><div class="dsec-head"><h3>⚡ Actions</h3>' + (fl ? '<span class="flag ' + fl[0] + '">' + fl[1] + '</span>' : '') + '</div>' +
-      staffField() + '<div class="act-row">' + actions + '</div>' +
+      '<div class="act-row">' + actions + '</div>' + notifyBox(b) +
       '<div id="reasonBox" class="hidden"><div class="field"><input id="pReason" maxlength="200" placeholder=" "><label for="pReason">Reason</label></div>' +
       '<div class="act-row"><button type="button" class="chip-btn dark" id="reasonCancel">Back</button><button type="button" class="btn btn-sea" id="reasonGo">Confirm</button></div></div>' +
       (b['Cancel Reason'] && (b.Status === 'Cancelled' || b.Status === 'No-show') ? '<p class="fine">Reason: ' + esc(b['Cancel Reason']) + '</p>' : '') + '</section>' +
@@ -591,6 +593,14 @@
       '<div class="act-row"><button type="button" class="btn btn-sea" id="payAdd">Record payment</button>' +
       (bal > 0.5 ? '<button type="button" class="btn btn-sun" id="payFull">Mark as paid (' + inr(bal) + ')</button>' : '') +
       '<button type="button" class="chip-btn dark" id="payRefund">Record refund</button></div></section>' +
+
+      '<section class="dsec"><h3>✉️ Guest emails</h3>' + (b.Email
+        ? '<p class="fine">Sends to ' + esc(b.Email) + '. Every email is recorded in Settings → Activity.</p><div class="act-row">' +
+          (['Confirmed', 'Checked in'].indexOf(b.Status) > -1 ? '<button type="button" class="chip-btn dark" data-mail="bookingConfirmed">Resend confirmation</button>' : '') +
+          (b.Status === 'Confirmed' && !b['Check-in Ref'] ? '<button type="button" class="chip-btn dark" data-mail="preArrival">Send check-in reminder</button>' : '') +
+          (pays.length ? '<button type="button" class="chip-btn dark" data-mail="paymentReceipt">Send latest receipt</button>' : '') +
+          (b.Status === 'Requested' ? '<button type="button" class="chip-btn dark" data-mail="requestReceived">Resend request acknowledgement</button>' : '') + '</div>'
+        : '<p class="form-warn">No guest email on this booking, so no emails can go out. Add it with Edit below.</p>') + '</section>' +
 
       '<section class="dsec"><h3>📝 Guest check-in form</h3>' +
       (b['Check-in Ref']
@@ -633,24 +643,26 @@
         }
         const staff = takeStaff(); if (!staff) return;
         if (to === 'Checked in' && !b['Check-in Ref']) toast('Note: guest check-in form not received yet.');
-        return busy(st, async () => { await call('bookingStatus', { id: openBookingId, status: to, staff }); toast('Booking ' + to.toLowerCase() + '.'); await quietReload(); });
+        return busy(st, async () => { await call('bookingStatus', { id: openBookingId, status: to, notifyGuest: notifyOn() }); toast('Booking ' + to.toLowerCase() + '.'); await quietReload(); });
       }
       if (t.id === 'reasonCancel') { $('#reasonBox').classList.add('hidden'); return; }
       if (t.id === 'reasonGo') {
         const staff = takeStaff(); if (!staff) return;
         const reason = $('#pReason').value.trim();
         if (!reason) return toast('Please give a reason.');
-        return busy(t, async () => { await call('bookingStatus', { id: openBookingId, status: pendingStatus, reason, staff }); toast('Booking marked ' + pendingStatus.toLowerCase() + '.'); await quietReload(); });
+        return busy(t, async () => { await call('bookingStatus', { id: openBookingId, status: pendingStatus, reason, notifyGuest: notifyOn() }); toast('Booking marked ' + pendingStatus.toLowerCase() + '.'); await quietReload(); });
       }
       if (t.id === 'payAdd' || t.id === 'payRefund' || t.id === 'payFull') {
         const staff = takeStaff(); if (!staff) return;
         const mode = $('#payMode').value, reference = $('#payRef').value.trim();
-        if (t.id === 'payFull') return busy(t, async () => { await call('markPaid', { data: { bookingId: openBookingId, mode, reference }, staff }); toast('Marked as paid.'); await quietReload(); });
+        if (t.id === 'payFull') return busy(t, async () => { await call('markPaid', { data: { bookingId: openBookingId, mode, reference, notifyGuest: notifyOn() } }); toast('Marked as paid.'); await quietReload(); });
         const amount = num($('#payAmt').value);
         if (!(amount > 0)) return toast('Enter an amount.');
         const kind = t.id === 'payRefund' ? 'Refund' : 'Payment';
-        return busy(t, async () => { await call('addPayment', { data: { bookingId: openBookingId, amount, mode, reference, kind }, staff }); toast(kind + ' of ' + inr(amount) + ' recorded.'); await quietReload(); });
+        return busy(t, async () => { await call('addPayment', { data: { bookingId: openBookingId, amount, mode, reference, kind, notifyGuest: notifyOn() } }); toast(kind + ' of ' + inr(amount) + ' recorded.'); await quietReload(); });
       }
+      const ml = t.closest('[data-mail]');
+      if (ml) return busy(ml, async () => { await call('sendForBooking', { key: ml.dataset.mail, id: openBookingId }); toast('Email sent to ' + b.Email + '.'); });
       if (t.id === 'copyLink') {
         try { await navigator.clipboard.writeText(t.dataset.link); toast('Check-in link copied.'); }
         catch (err) { window.prompt('Copy this link', t.dataset.link); }
@@ -691,7 +703,7 @@
       '<div class="form-grid">' +
       '<div class="field full"><input id="bfName" maxlength="120" placeholder=" " value="' + esc(b['Guest Name'] || '') + '"><label for="bfName">Guest name</label></div>' +
       '<div class="field"><input id="bfMobile" type="tel" inputmode="tel" placeholder=" " value="' + esc(b.Mobile || '') + '"><label for="bfMobile">Mobile</label></div>' +
-      '<div class="field"><input id="bfEmail" type="email" placeholder=" " value="' + esc(b.Email || '') + '"><label for="bfEmail">Email (optional)</label></div>' +
+      '<div class="field"><input id="bfEmail" type="email" placeholder=" " value="' + esc(b.Email || '') + '"><label for="bfEmail">Email (needed for confirmations)</label></div>' +
       '<label class="lbl">Check-in<input id="bfIn" type="date" class="sel" value="' + inD + '"></label>' +
       '<label class="lbl">Check-out<input id="bfOut" type="date" class="sel" value="' + outD + '"></label>' +
       '<label class="lbl">Adults<input id="bfAdults" type="number" min="1" max="30" class="sel" value="' + esc(b.Adults || 2) + '"></label>' +
@@ -711,7 +723,7 @@
       '<p class="total-line">Total <strong id="bfTotal">₹0</strong> <button type="button" class="link-btn" id="bfAuto">Use room rates</button></p>' +
       '<div class="field"><textarea id="bfRequests" rows="2" maxlength="500" placeholder=" ">' + esc(b['Special Requests'] || '') + '</textarea><label for="bfRequests">Guest requests</label></div>' +
       '<div class="field"><textarea id="bfNotes" rows="2" maxlength="500" placeholder=" ">' + esc(b['Internal Notes'] || '') + '</textarea><label for="bfNotes">Internal notes (staff only)</label></div>' +
-      staffField() +
+      (isNew ? '<label class="chk-line"><input type="checkbox" id="bfNotify" checked> Email the confirmation and check-in link to the guest (Confirmed bookings with an email)</label>' : '') +
       '<p id="bfWarn" class="form-warn hidden"></p>' +
       '<div class="act-row end"><button type="button" class="chip-btn dark" id="bfCancel">Cancel</button><button type="button" class="btn btn-sun" id="bfSave">' + (isNew ? 'Create booking' : 'Save changes') + '</button></div>';
     openPanel('bookingForm', isNew ? 'New booking' : b['Booking ID'], isNew ? 'New booking' : 'Edit ' + b['Guest Name'], '', body);
@@ -751,8 +763,8 @@
     $('#bfWarn').classList.toggle('hidden', !warns.length);
   }
   function saveBookingForm(btn) {
-    const staff = takeStaff(); if (!staff) return;
     const data = {
+      notifyGuest: $('#bfNotify') ? $('#bfNotify').checked : false,
       id: openBookingId || '', guestName: $('#bfName').value, mobile: $('#bfMobile').value, email: $('#bfEmail').value,
       checkIn: $('#bfIn').value, checkOut: $('#bfOut').value, adults: $('#bfAdults').value, children: $('#bfChildren').value,
       source: $('#bfSource').value, status: $('#bfStatus').value,
@@ -763,7 +775,7 @@
     if (!data.guestName.trim()) return toast('Enter the guest name.');
     if (!/^\+?[0-9 ]{8,16}$/.test(data.mobile.trim())) return toast('Enter a valid mobile number.');
     return busy(btn, async () => {
-      const res = await call('saveBooking', { data, staff });
+      const res = await call('saveBooking', { data });
       openBookingId = res.id;
       toast(data.id ? 'Booking updated.' : 'Booking ' + res.id + ' created.');
       panelMode = 'booking';
@@ -841,8 +853,270 @@
   function saveRoomForm(btn) {
     const data = { id: editRoomId, name: $('#rfName').value, type: $('#rfType').value, status: $('#rfStatus').value, capacity: $('#rfCap').value, rate: $('#rfRate').value, sort: $('#rfSort').value, description: $('#rfDesc').value, notes: $('#rfNotes').value };
     if (!data.name.trim()) return toast('Enter a room name.');
-    return busy(btn, async () => { await call('saveRoom', { data, staff: staffName }); toast(editRoomId ? 'Room saved.' : 'Room added.'); $('#panel').close(); await quietReload(); });
+    return busy(btn, async () => { await call('saveRoom', { data }); toast(editRoomId ? 'Room saved.' : 'Room added.'); $('#panel').close(); await quietReload(); });
   }
+
+  function notifyBox(b) {
+    return b.Email ? '<label class="chk-line"><input type="checkbox" id="pNotify" checked> Email the guest about this change</label>' : '';
+  }
+
+  /* =====================================================================
+     SETTINGS · USERS · EMAIL · ACTIVITY
+     ===================================================================== */
+  let stab = 'account', sdata = null, users = [], roles = [], mailerCode = '', trChoice = '';
+  const STABS = [
+    ['account', '👤 My account', false], ['users', '👥 Users', true], ['email', '✉️ Email setup', true],
+    ['notify', '🔔 Notifications', true], ['activity', '🧾 Activity', false]
+  ];
+  const TRANSPORTS = [
+    ['off', 'Off', 'No emails are sent. Everything else works as before.'],
+    ['relay', 'Sender’s Google account', 'Emails go out from another Gmail or Google Workspace account (for example Chirag’s) through a small Mailer script in that account. Limit 100 emails a day on Gmail, 1,500 on Workspace.'],
+    ['brevo', 'Brevo', 'Transactional email service. Needs a free Brevo account, an API key and a verified sender address. Best for a custom domain.'],
+    ['self', 'This script’s account', 'Sends from the Google account that runs the app. Use for testing.']
+  ];
+  const field = (id, label, val, type, extra) => '<div class="field"><input id="' + id + '" type="' + (type || 'text') + '" placeholder=" " value="' + esc(val || '') + '"' + (extra || '') + '><label for="' + id + '">' + label + '</label></div>';
+
+  function renderSTabs() {
+    $('#sTabs').innerHTML = STABS.filter(t => !t[2] || isSuper()).map(t => '<button type="button" data-s="' + t[0] + '"' + (t[0] === stab ? ' class="on"' : '') + '>' + t[1] + '</button>').join('');
+  }
+  async function openSettings(tab) {
+    if (tab) stab = tab;
+    if (STABS.find(t => t[0] === stab)[2] && !isSuper()) stab = 'account';
+    showSection('settings');
+    renderSTabs();
+    $('#sBody').innerHTML = '<div class="skeleton"></div>';
+    try {
+      if (stab === 'account') return renderAccount();
+      if (stab === 'users') { const r = await call('users'); users = r.users; roles = r.roles; return renderUsers(); }
+      if (stab === 'email' || stab === 'notify') { sdata = await call('settings'); return stab === 'email' ? renderEmail() : renderNotify(); }
+      if (stab === 'activity') return renderActivity();
+    } catch (err) { $('#sBody').innerHTML = '<p class="form-warn">' + esc(err.message) + '</p>'; }
+  }
+  $('#sTabs').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) openSettings(b.dataset.s); });
+  $('#meChip').addEventListener('click', () => openSettings('account'));
+  $('#secNav').addEventListener('click', e => { const b = e.target.closest('[data-sec="settings"]'); if (b) openSettings(); });
+
+  /* ---- my account ---- */
+  function renderAccount() {
+    $('#sBody').innerHTML =
+      '<div class="scard"><h3>' + esc(me.name) + '</h3><p class="fine">Username <b>' + esc(me.username) + '</b> · ' + esc(me.role) + '</p>' +
+      '<p class="fine">Your name is recorded automatically on every check-in, payment and status change.</p></div>' +
+      '<div class="scard"><h3>Change password</h3>' +
+      field('cpOld', 'Current password', '', 'password', ' autocomplete="current-password"') +
+      field('cpNew', 'New password (10+ characters)', '', 'password', ' autocomplete="new-password"') +
+      field('cpNew2', 'Repeat new password', '', 'password', ' autocomplete="new-password"') +
+      '<div class="act-row end"><button type="button" class="btn btn-sea" id="cpSave">Update password</button></div></div>';
+  }
+
+  /* ---- users ---- */
+  function renderUsers() {
+    $('#sBody').innerHTML =
+      '<div class="sec-head"><h2>Users</h2><button type="button" class="btn btn-sun" id="uNew">+ Add user</button></div>' +
+      '<p class="fine"><b>Super admin</b>: everything, plus users, email setup and notifications. <b>Admin</b>: bookings, guest log, rooms and payments.</p>' +
+      '<div class="guest-list">' + users.map(u =>
+        '<button type="button" class="gcard" data-user="' + esc(u.username) + '"><span class="avatar">' + esc(initials(u.name)) + '</span>' +
+        '<span class="g-main"><strong>' + esc(u.name) + (u.username === me.username ? ' <em class="src">you</em>' : '') + '</strong><small>' + esc(u.username) + (u.email ? ' · ' + esc(u.email) : '') + '</small></span>' +
+        '<span class="g-stay"><small>Last sign-in</small><b>' + esc(u.lastLogin || 'Never') + '</b></span>' +
+        '<span class="g-badges"><span class="badge role-' + slug(u.role) + '">' + esc(u.role) + '</span>' + (u.status !== 'Active' ? '<span class="flag late">' + esc(u.status) + '</span>' : '') + '</span></button>').join('') + '</div>';
+  }
+  function userForm(u) {
+    const isNew = !u; u = u || { role: 'Admin', status: 'Active' };
+    const body = '<div class="form-grid">' +
+      (isNew ? field('ufUser', 'Username (sign-in name)', '', 'text', ' maxlength="30" autocomplete="off"') : '') +
+      field('ufName', 'Full name (shown on records)', u.name, 'text', ' maxlength="60"') +
+      field('ufEmail', 'Email (optional)', u.email, 'email') +
+      '<label class="lbl">Role<select id="ufRole" class="sel">' + opts(roles, u.role) + '</select></label>' +
+      '<label class="lbl">Status<select id="ufStatus" class="sel">' + opts(['Active', 'Disabled'], u.status) + '</select></label>' +
+      '</div>' +
+      field('ufPass', isNew ? 'Password (10+ characters)' : 'New password (leave blank to keep)', '', 'text', ' autocomplete="off"') +
+      '<button type="button" class="link-btn" id="ufGen">Generate a strong password</button>' +
+      '<p class="fine">Share the password privately. The user can change it under My account.</p>' +
+      '<div class="act-row end"><button type="button" class="chip-btn dark" id="ufCancel">Cancel</button><button type="button" class="btn btn-sun" id="ufSave">' + (isNew ? 'Create user' : 'Save user') + '</button></div>';
+    openPanel('userForm', isNew ? 'New user' : u.username, isNew ? 'Add a user' : u.name, isNew ? '' : '<span class="badge role-' + slug(u.role) + '">' + esc(u.role) + '</span>', body);
+    $('#pBody').dataset.uname = isNew ? '' : u.username;
+  }
+  function genPass() {
+    const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const a = new Uint32Array(14); crypto.getRandomValues(a);
+    return Array.from(a, x => c[x % c.length]).join('');
+  }
+
+  /* ---- email setup ---- */
+  function renderEmail() {
+    const ig = sdata.integration, tr = sdata.triggers, cur = trChoice || ig.transport;
+    $('#sBody').innerHTML =
+      '<div class="scard"><h3>How emails are sent</h3><div class="tr-list">' + TRANSPORTS.map(t =>
+        '<label class="tr-opt' + (cur === t[0] ? ' on' : '') + '"><input type="radio" name="tr" value="' + t[0] + '"' + (cur === t[0] ? ' checked' : '') + '><span><b>' + t[1] + '</b><small>' + t[2] + '</small></span></label>').join('') + '</div></div>' +
+
+      '<div class="scard tr-cfg" data-for="relay"><h3>Sender’s Google account (Mailer)</h3>' +
+      '<ol class="steps-list"><li>Generate the Mailer code below and send it privately to the sender (for example Chirag).</li>' +
+      '<li>Signed in to <b>their</b> Google account, they open <b>script.new</b>, replace everything with the code and save.</li>' +
+      '<li>They click <b>Deploy → New deployment → Web app</b>, set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, deploy and approve the permission.</li>' +
+      '<li>They send back the <b>Web app URL</b> (ends in /exec). Paste it below, choose this option above and save.</li></ol>' +
+      '<p class="fine">Signing key: ' + (ig.relaySecretSet ? '<b>' + esc(ig.relaySecretMasked) + '</b>' : 'not generated yet') + '. Generating a new key stops the old Mailer code from working until it is replaced.</p>' +
+      '<div class="act-row"><button type="button" class="chip-btn dark" id="mGen">' + (ig.relaySecretSet ? 'Generate new key + code' : 'Generate Mailer code') + '</button></div>' +
+      (mailerCode ? '<textarea id="mCode" class="code-box" rows="8" readonly>' + esc(mailerCode) + '</textarea><div class="act-row"><button type="button" class="chip-btn dark" id="mCopy">Copy code</button></div>' : '') +
+      field('mUrl', 'Mailer web app URL', ig.relayUrl, 'url') + '</div>' +
+
+      '<div class="scard tr-cfg" data-for="brevo"><h3>Brevo</h3>' +
+      field('bvKey', 'API key' + (ig.brevoKeyMasked ? ' (saved ' + ig.brevoKeyMasked + ', leave blank to keep)' : ''), '', 'password', ' autocomplete="off"') +
+      field('bvSender', 'Verified sender email', ig.brevoSender, 'email') + '</div>' +
+
+      '<div class="act-row end"><button type="button" class="btn btn-sun" id="igSave">Save email setup</button></div>' +
+
+      '<div class="scard"><h3>Send a test</h3>' + field('tTo', 'Send test to', me.email || '', 'email') +
+      '<div class="act-row"><button type="button" class="btn btn-sea" id="tSend">Send test email</button></div>' +
+      (ig.lastTest ? '<p class="fine">Last test: ' + esc(ig.lastTest) + '</p>' : '') + '</div>' +
+
+      '<div class="scard"><h3>Automatic jobs</h3>' +
+      '<p class="fine">Daily at 8:00 AM IST: staff summary and pre-arrival reminders. Hourly: retry failed emails (up to 3 tries).</p>' +
+      '<p>' + (tr.daily && tr.retry ? '🟢 Running' + (tr.installedAt ? ' · installed ' + esc(tr.installedAt) : '') : '⚪ Not installed') + '</p>' +
+      '<div class="act-row"><button type="button" class="chip-btn dark" id="trInstall">' + (tr.daily ? 'Reinstall' : 'Install') + ' automatic jobs</button></div></div>';
+    syncTr();
+  }
+  function syncTr() {
+    const v = (document.querySelector('input[name="tr"]:checked') || {}).value;
+    document.querySelectorAll('.tr-opt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+    document.querySelectorAll('.tr-cfg').forEach(c => c.classList.toggle('hidden', c.dataset.for !== v));
+  }
+
+  /* ---- notifications ---- */
+  const SFIELDS = [
+    ['senderName', 'Sender name (shown in the inbox)'], ['replyTo', 'Reply-to email (guest replies go here)'],
+    ['staffEmails', 'Staff emails for alerts (comma separated)'], ['siteUrl', 'Website address'],
+    ['caretakerName', 'Caretaker name'], ['caretakerPhone', 'Caretaker phone'], ['propertyPhone', 'Property phone'],
+    ['checkInTime', 'Check-in time'], ['checkOutTime', 'Check-out time']
+  ];
+  function renderNotify() {
+    const st = sdata.settings;
+    $('#sBody').innerHTML =
+      '<div class="scard"><h3>Details used in emails</h3><div class="form-grid">' + SFIELDS.map(f => field('sf_' + f[0], f[1], st[f[0]])).join('') + '</div>' +
+      '<div class="act-row end"><button type="button" class="btn btn-sea" id="sfSave">Save details</button></div></div>' +
+      (sdata.integration.transport === 'off' ? '<p class="form-warn">Email is switched off. Choose a sender under Email setup to start sending.</p>' : '') +
+      '<div class="scard"><h3>Emails</h3><div class="tpl-list">' + Object.keys(st.templates).map(k => {
+        const t = st.templates[k];
+        return '<div class="tpl"><label class="switch"><input type="checkbox" data-tpl-on="' + k + '"' + (t.on ? ' checked' : '') + '><span></span></label>' +
+          '<span class="tpl-main"><b>' + esc(t.label) + '</b><small>' + esc(t.audience) + ' · ' + esc(t.when) + (t.customised ? ' · edited' : '') + '</small></span>' +
+          '<button type="button" class="chip-btn dark" data-tpl="' + k + '">Edit</button></div>';
+      }).join('') + '</div></div>';
+  }
+  function templateForm(k) {
+    const t = sdata.settings.templates[k];
+    const body =
+      '<p class="fine">' + esc(t.audience) + ' · ' + esc(t.when) + '</p>' +
+      field('tpSubject', 'Subject', t.subject) +
+      '<div class="field"><textarea id="tpBody" rows="12" placeholder=" ">' + esc(t.body) + '</textarea><label for="tpBody">Message</label></div>' +
+      '<p class="fine">Placeholders: {{guestName}} {{guestFirstName}} {{bookingId}} {{checkIn}} {{checkOut}} {{nights}} {{guests}} {{rooms}} {{total}} {{paid}} {{balance}} {{checkinLink}} {{senderName}} {{caretakerName}} {{caretakerPhone}} {{propertyPhone}} {{checkInTime}} {{checkOutTime}}. A line with only a link becomes a button.</p>' +
+      '<div class="act-row"><button type="button" class="chip-btn dark" id="tpPreview">Preview</button>' + (t.customised ? '<button type="button" class="chip-btn danger" id="tpReset">Reset to default</button>' : '') + '</div>' +
+      '<div id="tpOut"></div>' +
+      '<div class="act-row end"><button type="button" class="chip-btn dark" id="tpCancel">Cancel</button><button type="button" class="btn btn-sun" id="tpSave">Save email</button></div>';
+    openPanel('tplForm', t.audience + ' email', t.label, '', body);
+    $('#pBody').dataset.tpl = k;
+  }
+
+  /* ---- activity ---- */
+  let actTab = 'audit';
+  async function renderActivity() {
+    const tabs = '<div class="tabs" id="actTabs"><button type="button" data-a="audit"' + (actTab === 'audit' ? ' class="on"' : '') + '>Changes</button><button type="button" data-a="email"' + (actTab === 'email' ? ' class="on"' : '') + '>Emails</button></div>';
+    $('#sBody').innerHTML = tabs + '<div class="skeleton"></div>';
+    if (actTab === 'audit') {
+      const r = await call('audit');
+      $('#sBody').innerHTML = tabs + (isSuper() ? '' : '<p class="fine">Showing your own actions.</p>') +
+        '<div class="log-table">' + (r.rows.length ? r.rows.map(x => '<div class="lrow"><span class="lt">' + esc(x.At) + '</span><span><b>' + esc(x.User) + '</b> ' + esc(x.Action) + ' <em>' + esc(x.Record) + '</em><small>' + esc(x.Summary) + '</small></span></div>').join('') : '<p class="fine">Nothing yet.</p>') + '</div>';
+    } else {
+      const r = await call('emailLog');
+      $('#sBody').innerHTML = tabs + '<div class="log-table">' + (r.rows.length ? r.rows.map(x =>
+        '<div class="lrow"><span class="lt">' + esc(x.At) + '</span><span><span class="badge em-' + slug(x.Status) + '">' + esc(x.Status) + '</span> <b>' + esc(x.Subject) + '</b><small>' + esc(x.To) + (x.Booking ? ' · ' + esc(x.Booking) : '') + ' · ' + esc(x.Template) + (x.Transport ? ' · ' + esc(x.Transport) : '') + (x.Error ? ' · ' + esc(x.Error) : '') + '</small></span>' +
+        (isSuper() && x.Status !== 'Sent' ? '<button type="button" class="chip-btn dark" data-resend="' + esc(x['Email ID']) + '">Retry</button>' : '') + '</div>').join('') : '<p class="fine">No emails yet.</p>') + '</div>';
+    }
+  }
+
+  /* ---- settings events ---- */
+  $('#sBody').addEventListener('change', e => {
+    if (e.target.name === 'tr') { trChoice = e.target.value; return syncTr(); }
+    const on = e.target.dataset.tplOn;
+    if (on) {
+      const box = e.target;
+      call('saveSettings', { data: { templates: { [on]: { on: box.checked } } } })
+        .then(r => { sdata.settings = r.settings; toast(sdata.settings.templates[on].label + (box.checked ? ' on.' : ' off.')); })
+        .catch(err => { box.checked = !box.checked; toast(err.message); });
+    }
+  });
+  $('#sBody').addEventListener('click', async e => {
+    const t = e.target;
+    const at = t.closest('[data-a]');
+    if (at) { actTab = at.dataset.a; return renderActivity().catch(err => toast(err.message)); }
+    if (t.id === 'cpSave') {
+      const o = $('#cpOld').value, n = $('#cpNew').value;
+      if (n.length < 10) return toast('New password must be at least 10 characters.');
+      if (n !== $('#cpNew2').value) return toast('The new passwords do not match.');
+      return busy(t, async () => { await call('changePassword', { oldPassword: o, newPassword: n }); toast('Password updated.'); renderAccount(); });
+    }
+    if (t.id === 'uNew') return userForm(null);
+    const uc = t.closest('[data-user]');
+    if (uc) return userForm(users.find(u => u.username === uc.dataset.user));
+    if (t.id === 'mGen') {
+      if (sdata.integration.relaySecretSet && !confirmInline(t, 'Replace the key? The current Mailer stops working until updated.')) return;
+      return busy(t, async () => { const r = await call('newMailerSecret'); mailerCode = r.code; sdata = await call('settings'); renderEmail(); toast('Mailer code ready. Copy it and send it privately.'); });
+    }
+    if (t.id === 'mCopy') {
+      try { await navigator.clipboard.writeText(mailerCode); toast('Mailer code copied.'); } catch (err) { $('#mCode').select(); toast('Press Ctrl/Cmd + C to copy.'); }
+      return;
+    }
+    if (t.id === 'igSave') {
+      const data = { transport: (document.querySelector('input[name="tr"]:checked') || {}).value || 'off', relayUrl: $('#mUrl').value.trim(), brevoSender: $('#bvSender').value.trim() };
+      if ($('#bvKey').value.trim()) data.brevoKey = $('#bvKey').value.trim();
+      return busy(t, async () => { const r = await call('saveIntegration', { data }); sdata.integration = r; trChoice = ''; renderEmail(); toast('Email setup saved.'); });
+    }
+    if (t.id === 'tSend') {
+      const to = $('#tTo').value.trim();
+      if (!to) return toast('Enter an email address.');
+      return busy(t, async () => { const r = await call('testEmail', { to }); toast('Test sent to ' + to + (r.remaining != null ? ' · ' + r.remaining + ' left today' : '') + '.'); sdata = await call('settings'); renderEmail(); });
+    }
+    if (t.id === 'trInstall') return busy(t, async () => { await call('installTriggers'); sdata = await call('settings'); renderEmail(); toast('Automatic jobs installed.'); });
+    if (t.id === 'sfSave') {
+      const data = {}; SFIELDS.forEach(f => { data[f[0]] = $('#sf_' + f[0]).value.trim(); });
+      return busy(t, async () => { const r = await call('saveSettings', { data }); sdata.settings = r.settings; toast('Details saved.'); });
+    }
+    const tp = t.closest('[data-tpl]');
+    if (tp) return templateForm(tp.dataset.tpl);
+    const rs = t.closest('[data-resend]');
+    if (rs) return busy(rs, async () => { await call('resendEmail', { id: rs.dataset.resend }); toast('Email sent.'); await renderActivity(); });
+  });
+  function confirmInline(btn, text) {
+    if (btn.dataset.armed) { delete btn.dataset.armed; return true; }
+    btn.dataset.armed = '1'; toast(text + ' Click again to confirm.');
+    setTimeout(() => { delete btn.dataset.armed; }, 5000);
+    return false;
+  }
+
+  /* ---- panel forms: users and templates ---- */
+  $('#pBody').addEventListener('click', async e => {
+    const t = e.target;
+    if (panelMode === 'userForm') {
+      if (t.id === 'ufCancel') return $('#panel').close();
+      if (t.id === 'ufGen') { $('#ufPass').value = genPass(); return; }
+      if (t.id === 'ufSave') {
+        const existing = $('#pBody').dataset.uname;
+        const data = { isNew: !existing, username: existing || $('#ufUser').value.trim().toLowerCase(), name: $('#ufName').value.trim(), email: $('#ufEmail').value.trim(), role: $('#ufRole').value, status: $('#ufStatus').value, password: $('#ufPass').value };
+        if (!data.username || !data.name) return toast('Enter the username and name.');
+        if ((data.isNew || data.password) && data.password.length < 10) return toast('Password must be at least 10 characters.');
+        return busy(t, async () => { await call('saveUser', { data }); $('#panel').close(); toast(data.isNew ? 'User ' + data.username + ' created.' : 'User saved.'); await openSettings('users'); });
+      }
+    }
+    if (panelMode === 'tplForm') {
+      const k = $('#pBody').dataset.tpl;
+      if (t.id === 'tpCancel') return $('#panel').close();
+      if (t.id === 'tpPreview') return busy(t, async () => {
+        const r = await call('previewEmail', { key: k, draft: { subject: $('#tpSubject').value, body: $('#tpBody').value } });
+        $('#tpOut').innerHTML = '<p class="fine"><b>Subject:</b> ' + esc(r.email.subject) + '</p><iframe class="mail-prev" sandbox="" title="Email preview"></iframe>';
+        $('#tpOut iframe').srcdoc = r.email.html;
+      });
+      const save = (tpl) => busy(t, async () => { const r = await call('saveSettings', { data: { templates: { [k]: tpl } } }); sdata.settings = r.settings; $('#panel').close(); renderNotify(); toast('Email saved.'); });
+      if (t.id === 'tpSave') return save({ subject: $('#tpSubject').value, body: $('#tpBody').value });
+      if (t.id === 'tpReset') return save({ reset: true });
+    }
+  });
 
   /* ---------- init ---------- */
   if (token) { setView(true); load().catch(err => toast(err.message)); } else setView(false);

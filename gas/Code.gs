@@ -1,7 +1,7 @@
 /**
  * Swarga by the Bay — Guest Check-In API (Google Apps Script)
  * Storage: bound Google Sheet (tab "CheckIns") + Drive folder for ID photos.
- * Front end (Cloudways) POSTs JSON as text/plain to avoid CORS preflight.
+ * Front end (Cloudflare Pages) POSTs JSON as text/plain to avoid CORS preflight.
  *
  * Script Properties (set by running setup() / setAdmin() once):
  *   ADMIN_USER, ADMIN_SALT, ADMIN_HASH, ID_FOLDER_ID, MASTER_FOLDER_ID (optional)
@@ -74,29 +74,56 @@ function doGet() {
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents || '{}');
-    switch (body.action) {
-      case 'submit': return json_(submit_(body.data || {}));
-      case 'login':  return json_(login_(body.username, body.password));
-      case 'logout': requireAdmin_(body.token); CacheService.getScriptCache().remove('tok_' + body.token); return json_({ ok: true });
-      case 'list':   requireAdmin_(body.token); return json_(list_());
-      case 'photo':  requireAdmin_(body.token); return json_(photo_(body.id));
-      case 'verify': requireAdmin_(body.token); return json_(verify_(body.id, body.repName));
-      case 'vehicles': requireAdmin_(body.token); return json_(updateVehicles_(body.id, body.count, body.numbers));
-      case 'stay':   requireAdmin_(body.token); return json_(stay_(body.id, body.move, body.staff));
-      // bookings — public
+    const a = body.action;
+
+    // public
+    switch (a) {
+      case 'submit':       return json_(submit_(body.data || {}));
+      case 'login':        return json_(login_(body.username, body.password));
       case 'rooms':        return json_(publicRooms_());
       case 'availability': return json_(availability_(body.from, body.to));
       case 'request':      return json_(requestBooking_(body.data || {}));
       case 'booking':      return json_(bookingForCheckin_(body.code));
-      // bookings — admin
-      case 'data':          requireAdmin_(body.token); return json_(adminData_());
-      case 'saveRoom':      requireAdmin_(body.token); return json_(saveRoom_(body.data || {}, body.staff));
-      case 'saveBooking':   requireAdmin_(body.token); return json_(saveBooking_(body.data || {}, body.staff));
-      case 'bookingStatus': requireAdmin_(body.token); return json_(bookingStatus_(body.id, body.status, body.reason, body.staff));
-      case 'addPayment':    requireAdmin_(body.token); return json_(addPayment_(body.data || {}, body.staff));
-      case 'markPaid':      requireAdmin_(body.token); return json_(markPaid_(body.data || {}, body.staff));
-      default:       return json_({ ok: false, error: 'Unknown action' });
     }
+
+    // Super admin only
+    const SUPER = {
+      users:           (b, s) => listUsers_(),
+      saveUser:        (b, s) => saveUser_(b.data || {}, s),
+      settings:        (b, s) => ({ ok: true, settings: getSettings_(), integration: getIntegration_(), triggers: triggerStatus_() }),
+      saveSettings:    (b, s) => saveSettings_(b.data || {}, s),
+      saveIntegration: (b, s) => saveIntegration_(b.data || {}, s),
+      newMailerSecret: (b, s) => newMailerSecret_(s),
+      testEmail:       (b, s) => testEmail_(b.to, s),
+      previewEmail:    (b, s) => previewEmail_(b.key, b.draft),
+      installTriggers: (b, s) => installTriggers_(s),
+      resendEmail:     (b, s) => resendEmail_(b.id, s)
+    };
+    if (SUPER[a]) return json_(SUPER[a](body, requireSuper_(body.token)));
+
+    // any signed-in user (staff name comes from the session, never from the client)
+    const ADMIN = {
+      me:             (b, s) => ({ ok: true, user: { username: s.u, name: s.name, role: s.role } }),
+      logout:         (b, s) => { CacheService.getScriptCache().remove('tok_' + b.token); audit_(s, 'logout', s.u, ''); return { ok: true }; },
+      changePassword: (b, s) => changePassword_(s, b.oldPassword, b.newPassword),
+      audit:          (b, s) => auditList_(s),
+      emailLog:       (b, s) => emailLog_(),
+      sendForBooking: (b, s) => sendForBooking_(b.key, b.id, s),
+      list:           (b, s) => list_(),
+      photo:          (b, s) => photo_(b.id),
+      verify:         (b, s) => verify_(b.id, s),
+      vehicles:       (b, s) => updateVehicles_(b.id, b.count, b.numbers, s),
+      stay:           (b, s) => stay_(b.id, b.move, s),
+      data:           (b, s) => Object.assign(adminData_(), { user: { username: s.u, name: s.name, role: s.role } }),
+      saveRoom:       (b, s) => saveRoom_(b.data || {}, s),
+      saveBooking:    (b, s) => saveBooking_(b.data || {}, s),
+      bookingStatus:  (b, s) => bookingStatus_(b.id, b.status, b.reason, s, b.notifyGuest),
+      addPayment:     (b, s) => addPayment_(b.data || {}, s),
+      markPaid:       (b, s) => markPaid_(b.data || {}, s)
+    };
+    if (ADMIN[a]) return json_(ADMIN[a](body, requireAdmin_(body.token)));
+
+    return json_({ ok: false, error: 'Unknown action' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
   }
@@ -108,19 +135,21 @@ function submit_(d) {
   const req = ['guestName', 'mobile', 'adults', 'checkInDate', 'checkOutDate',
                'idType', 'idNumber', 'emergencyName', 'emergencyPhone', 'declarationName'];
   req.forEach(k => { if (!String(d[k] || '').trim()) throw new Error('Missing field: ' + k); });
+  if (!String(d.email || '').trim()) throw new Error('Email is required.');
   ['ackHouse', 'ackSea', 'ackWeather', 'ackLiability', 'ackData', 'declarationAgreed']
     .forEach(k => { if (d[k] !== true) throw new Error('All acknowledgements are required.'); });
   if (!/^\+?[0-9 ]{8,16}$/.test(d.mobile)) throw new Error('Invalid mobile number.');
-  if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) throw new Error('Invalid email.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(d.email).trim())) throw new Error('Invalid email.');
   if (d.checkOutDate < d.checkInDate) throw new Error('Check-out is before check-in.');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
+  let id, booking = null;
+  const bookingId = /^SBK-\d{6}-[A-Z0-9]{6}$/.test(String(d.bookingId || '').toUpperCase()) ? String(d.bookingId).toUpperCase() : '';
   try {
-    const id = 'SBB-' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyMMdd') + '-' +
+    id = 'SBB-' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyMMdd') + '-' +
                Utilities.getUuid().slice(0, 6).toUpperCase();
 
-    const bookingId = /^SBK-\d{6}-[A-Z0-9]{6}$/.test(String(d.bookingId || '').toUpperCase()) ? String(d.bookingId).toUpperCase() : '';
     let fileId = '';
     if (d.idPhoto && d.idPhoto.data) fileId = savePhoto_(id, d.guestName, d.idPhoto);
 
@@ -140,11 +169,16 @@ function submit_(d) {
       bookingId
     ];
     sheet_().appendRow(row);
-    if (bookingId) linkCheckin_(bookingId, id);
-    return { ok: true, id: id };
+    if (bookingId) booking = linkCheckin_(bookingId, id, clean_(d.email));
   } finally {
     lock.releaseLock();
   }
+  const veh = num_(d.vehicles);
+  notify_('staffCheckinReceived', booking || {
+    'Booking ID': '', 'Guest Name': clean_(d.guestName), 'Mobile': txt_(d.mobile), 'Email': clean_(d.email),
+    'Adults': num_(d.adults), 'Children': num_(d.children), 'Check-in Date': txt_(d.checkInDate), 'Check-out Date': txt_(d.checkOutDate)
+  }, { ref: id, extra: { submissionId: id, bookingId: bookingId || 'Not linked', vehicles: veh ? veh + (plates_(d.vehicleNumbers) ? ' · ' + plates_(d.vehicleNumbers) : '') : 'None' } });
+  return { ok: true, id: id };
 }
 
 function savePhoto_(id, name, photo) {
@@ -159,28 +193,6 @@ function savePhoto_(id, name, photo) {
 }
 
 /* ---------- admin ---------- */
-
-function login_(user, pass) {
-  const cache = CacheService.getScriptCache();
-  const fails = Number(cache.get('login_fails') || 0);
-  if (fails >= MAX_LOGIN_FAILS) throw new Error('Too many attempts. Try again in 15 minutes.');
-
-  const ok = String(user || '') === prop_('ADMIN_USER') &&
-             sha256_(prop_('ADMIN_SALT') + String(pass || '')) === prop_('ADMIN_HASH');
-  if (!ok) {
-    cache.put('login_fails', String(fails + 1), 900);
-    Utilities.sleep(800);
-    throw new Error('Invalid username or password.');
-  }
-  cache.remove('login_fails');
-  const token = Utilities.getUuid() + Utilities.getUuid();
-  cache.put('tok_' + token, '1', TOKEN_TTL_SEC);
-  return { ok: true, token: token, expiresIn: TOKEN_TTL_SEC };
-}
-
-function requireAdmin_(token) {
-  if (!token || !CacheService.getScriptCache().get('tok_' + token)) throw new Error('AUTH');
-}
 
 function list_() {
   const sh = sheet_();
@@ -197,20 +209,21 @@ function photo_(id) {
   return { ok: true, photo: { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) } };
 }
 
-function verify_(id, repName) {
-  if (!String(repName || '').trim()) throw new Error('Representative name required.');
+function verify_(id, sess) {
   const sh = sheet_();
   const r = findRow_(id);
   sh.getRange(r, HEADERS.indexOf('Rep Name') + 1, 1, 3)
-    .setValues([[clean_(repName), new Date(), 'Verified']]);
+    .setValues([[clean_(sess.name), new Date(), 'Verified']]);
+  audit_(sess, 'checkin.verify', id, 'ID verified');
   return { ok: true };
 }
 
-function updateVehicles_(id, count, numbers) {
+function updateVehicles_(id, count, numbers, sess) {
   const sh = sheet_();
   const r = findRow_(id);
   sh.getRange(r, HEADERS.indexOf('Vehicles') + 1).setValue(Math.min(num_(count), 20));
   sh.getRange(r, HEADERS.indexOf('Vehicle Numbers') + 1).setValue(plates_(numbers));
+  audit_(sess, 'checkin.vehicles', id, Math.min(num_(count), 20) + ' · ' + plates_(numbers));
   return { ok: true };
 }
 
@@ -218,7 +231,8 @@ function updateVehicles_(id, count, numbers) {
  * Stay lifecycle: Expected -> Checked in -> Checked out.
  * move: 'in' | 'out' | 'undo'. Records actual time (IST) and staff name.
  */
-function stay_(id, move, staff) {
+function stay_(id, move, sess) {
+  const staff = sess.name;
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -251,6 +265,7 @@ function stay_(id, move, staff) {
       throw new Error('Unknown move.');
     }
     syncBookingFromStay_(id, String(sh.getRange(r, c('Stay Status')).getValue()), who);
+    audit_(sess, 'checkin.stay', id, move === 'undo' ? 'undo → ' + sh.getRange(r, c('Stay Status')).getValue() : 'checked ' + move);
     return { ok: true };
   } finally {
     lock.releaseLock();
