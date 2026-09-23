@@ -77,6 +77,7 @@
       out.textContent = v;
       minus.disabled = v <= min;
       plus.disabled = v >= max;
+      if (name === 'vehicles') renderPlates(v);
     };
     st.addEventListener('click', e => {
       const b = e.target.closest('button');
@@ -86,6 +87,24 @@
       out.classList.remove('pop'); void out.offsetWidth; out.classList.add('pop');
     });
     sync(+hidden.value);
+  });
+
+  /* ---------- vehicle numbers ---------- */
+  function renderPlates(n) {
+    const list = $('#plateList');
+    const keep = $$('input', list).map(i => i.value);
+    list.innerHTML = Array.from({ length: n }, (_, i) =>
+      '<div class="field"><input id="plate' + i + '" class="plate" maxlength="15" autocomplete="off" autocapitalize="characters" placeholder=" " value="' + esc(keep[i] || '') + '">' +
+      '<label for="plate' + i + '">Vehicle ' + (i + 1) + ' number (e.g. KA 20 AB 1234)</label></div>').join('');
+    $('#plateBlock').classList.toggle('hidden', n === 0);
+  }
+  const plates = () => $$('#plateList input').map(i => i.value.trim().toUpperCase()).filter(Boolean);
+  $('#plateList').addEventListener('input', e => {
+    if (e.target.classList.contains('plate')) {
+      const pos = e.target.selectionStart;
+      e.target.value = e.target.value.toUpperCase();
+      e.target.setSelectionRange(pos, pos);
+    }
   });
 
   /* ---------- ID dropzone ---------- */
@@ -171,6 +190,7 @@
       item('Guests', guests, 0) +
       item('Check-in', fmtDate(f.checkInDate.value) + ' · ' + fmtTime(f.checkInTime.value), 0) +
       item('Check-out', fmtDate(f.checkOutDate.value) + ' · ' + fmtTime(f.checkOutTime.value), 0) +
+      (+f.vehicles.value ? item('Vehicles', f.vehicles.value + (plates().length ? ' · ' + plates().join(', ') : ' · number not given'), 0) : '') +
       item('ID', f.idType.value + ' · ' + f.idNumber.value, 2) +
       item('Emergency', f.emergencyName.value + ' · ' + f.emergencyPhone.value, 1);
   }
@@ -273,6 +293,7 @@
       const data = {
         guestName: f.guestName.value, mobile: f.mobile.value, email: f.email.value,
         adults: f.adults.value, children: f.children.value, vehicles: f.vehicles.value,
+        vehicleNumbers: plates(),
         checkInDate: f.checkInDate.value, checkInTime: f.checkInTime.value,
         checkOutDate: f.checkOutDate.value, checkOutTime: f.checkOutTime.value,
         idType: f.idType.value, idNumber: f.idNumber.value,

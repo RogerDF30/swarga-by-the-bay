@@ -21,7 +21,8 @@ const HEADERS = [
   'Ack House Rules', 'Ack Sea Safety', 'Ack Weather', 'Ack Liability', 'Ack Data Consent',
   'Group Booking', 'Lead Guest Name',
   'Declaration Name', 'Declaration Agreed',
-  'Rep Name', 'Rep Verified At', 'Status', 'User Agent'
+  'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
+  'Vehicle Numbers'   // appended later; keep new columns at the end
 ];
 
 /* ---------- one-time setup ---------- */
@@ -78,6 +79,7 @@ function doPost(e) {
       case 'list':   requireAdmin_(body.token); return json_(list_());
       case 'photo':  requireAdmin_(body.token); return json_(photo_(body.id));
       case 'verify': requireAdmin_(body.token); return json_(verify_(body.id, body.repName));
+      case 'vehicles': requireAdmin_(body.token); return json_(updateVehicles_(body.id, body.count, body.numbers));
       default:       return json_({ ok: false, error: 'Unknown action' });
     }
   } catch (err) {
@@ -116,7 +118,8 @@ function submit_(d) {
       'Yes', 'Yes', 'Yes', 'Yes', 'Yes',
       d.groupBooking ? 'Yes' : 'No', clean_(d.leadGuestName),
       clean_(d.declarationName), 'Yes',
-      '', '', 'Pending', clean_(d.userAgent).slice(0, 200)
+      '', '', 'Pending', clean_(d.userAgent).slice(0, 200),
+      plates_(d.vehicleNumbers)
     ];
     sheet_().appendRow(row);
     return { ok: true, id: id };
@@ -184,12 +187,32 @@ function verify_(id, repName) {
   return { ok: true };
 }
 
+function updateVehicles_(id, count, numbers) {
+  const sh = sheet_();
+  const r = findRow_(id);
+  sh.getRange(r, HEADERS.indexOf('Vehicles') + 1).setValue(Math.min(num_(count), 20));
+  sh.getRange(r, HEADERS.indexOf('Vehicle Numbers') + 1).setValue(plates_(numbers));
+  return { ok: true };
+}
+
 /* ---------- helpers ---------- */
 
 function sheet_() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   if (!sh) throw new Error('Run setup() first.');
+  // Add any header columns introduced after the sheet was created.
+  const width = sh.getLastColumn();
+  if (width < HEADERS.length) {
+    sh.getRange(1, width + 1, 1, HEADERS.length - width).setValues([HEADERS.slice(width)]).setFontWeight('bold');
+  }
   return sh;
+}
+
+/** Vehicle numbers: array or comma list -> "KA20AB1234, MH12CD5678" (uppercase, safe chars only). */
+function plates_(v) {
+  const list = Array.isArray(v) ? v : String(v || '').split(',');
+  return list.map(x => String(x || '').toUpperCase().replace(/[^A-Z0-9 -]/g, '').replace(/\s+/g, ' ').replace(/^[ -]+/, '').trim().slice(0, 15))
+    .filter(Boolean).slice(0, 20).join(', ');
 }
 
 function findRow_(id) {

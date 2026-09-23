@@ -140,7 +140,7 @@
       return '<button type="button" class="gcard" style="animation-delay:' + Math.min(i * 30, 400) + 'ms" data-id="' + esc(col(r, 'Submission ID')) + '">' +
         '<span class="avatar">' + esc(initials(col(r, 'Guest Name'))) + '</span>' +
         '<span class="g-main"><strong>' + esc(col(r, 'Guest Name')) + '</strong><small>' + esc(col(r, 'Submission ID')) + ' · ' + esc(col(r, 'Mobile')) + '</small></span>' +
-        '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + '</small></span>' +
+        '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + (+col(r, 'Vehicles') ? ' · 🚗 ' + esc(col(r, 'Vehicle Numbers') || col(r, 'Vehicles') + ' (no number)') : '') + '</small></span>' +
         '<span class="badge ' + esc(st) + '">' + esc(st) + '</span>' +
         '</button>';
     }).join('');
@@ -159,7 +159,7 @@
 
   /* ---------- detail drawer ---------- */
   const SECTIONS = [
-    ['👤 Guest', ['Guest Name', 'Mobile', 'Email', 'Adults', 'Children', 'Vehicles']],
+    ['👤 Guest', ['Guest Name', 'Mobile', 'Email', 'Adults', 'Children']],
     ['🆘 Emergency contact', ['Emergency Contact Name', 'Emergency Contact No.']],
     ['🪪 ID', ['ID Type', 'ID Number']],
     ['✅ Acknowledgements', ['Ack House Rules', 'Ack Sea Safety', 'Ack Weather', 'Ack Liability', 'Ack Data Consent', 'Group Booking', 'Lead Guest Name', 'Declaration Name', 'Declaration Agreed', 'Submitted At']]
@@ -187,6 +187,7 @@
       keys.filter(k => headers.includes(k) && (col(current, k) !== '' || k === 'Email'))
         .map(k => '<dt>' + esc(k.replace(/^Ack /, '')) + '</dt><dd>' + esc(col(current, k) || '—') + '</dd>').join('') +
       '</dl></section>').join('');
+    renderVehicles(false);
     $('#idProof').innerHTML = col(current, 'ID Photo File ID')
       ? '<button type="button" class="chip-btn dark" id="loadPhoto">View ID proof</button>'
       : '<p class="fine">No file uploaded.</p>';
@@ -195,6 +196,34 @@
       : '<div class="field"><input id="repName" maxlength="120" placeholder=" "><label for="repName">Representative name</label></div><button type="button" class="btn btn-sea wide" id="verifyBtn">Mark as verified</button>';
     $('#detail').showModal();
   }
+
+  /* ---------- vehicles (view / edit) ---------- */
+  function renderVehicles(editing) {
+    const n = +col(current, 'Vehicles') || 0;
+    const nums = String(col(current, 'Vehicle Numbers') || '').split(',').map(x => x.trim()).filter(Boolean);
+    $('#vehEdit').classList.toggle('hidden', editing);
+    if (!editing) {
+      $('#vehBlock').innerHTML = !n && !nums.length
+        ? '<p class="fine">No vehicle declared.</p>'
+        : '<dl><dt>Vehicles</dt><dd>' + n + '</dd><dt>Numbers</dt><dd>' +
+          (nums.length ? nums.map(x => '<span class="plate-tag">' + esc(x) + '</span>').join(' ') : '<span class="missing">Not given — add it</span>') +
+          '</dd></dl>';
+      return;
+    }
+    const rowsN = Math.max(n, nums.length, 1);
+    $('#vehBlock').innerHTML =
+      '<div class="veh-count"><span>Number of vehicles</span><div class="stepper" id="vehStep"><button type="button" data-d="-1">−</button><output>' + rowsN + '</output><button type="button" data-d="1">+</button></div></div>' +
+      '<div id="vehInputs"></div>' +
+      '<div class="veh-actions"><button type="button" class="chip-btn dark" id="vehCancel">Cancel</button><button type="button" class="btn btn-sea" id="vehSave">Save vehicles</button></div>';
+    drawVehInputs(rowsN, nums);
+  }
+  function drawVehInputs(n, vals) {
+    const keep = vals || [...document.querySelectorAll('#vehInputs input')].map(i => i.value);
+    $('#vehInputs').innerHTML = Array.from({ length: n }, (_, i) =>
+      '<div class="field"><input class="plate" id="vp' + i + '" maxlength="15" placeholder=" " value="' + esc(keep[i] || '') + '"><label for="vp' + i + '">Vehicle ' + (i + 1) + ' number</label></div>').join('');
+    $('#vehStep output').textContent = n;
+  }
+  $('#vehEdit').addEventListener('click', () => renderVehicles(true));
 
   $('#closeDlg').addEventListener('click', () => $('#detail').close());
   $('#detail').addEventListener('click', async (e) => {
@@ -215,6 +244,33 @@
         e.target.disabled = false;
         e.target.textContent = 'View ID proof';
       }
+    }
+    const vs = e.target.closest('#vehStep button');
+    if (vs) {
+      const n = Math.min(20, Math.max(0, +$('#vehStep output').textContent + +vs.dataset.d));
+      return drawVehInputs(n);
+    }
+    if (e.target.id === 'vehCancel') return renderVehicles(false);
+    if (e.target.id === 'vehSave') {
+      const count = +$('#vehStep output').textContent;
+      const numbers = [...document.querySelectorAll('#vehInputs input')].map(i => i.value.trim().toUpperCase()).filter(Boolean);
+      e.target.disabled = true;
+      e.target.textContent = 'Saving…';
+      try {
+        await call('vehicles', { id: col(current, 'Submission ID'), count, numbers });
+        current[headers.indexOf('Vehicles')] = String(count);
+        const vi = headers.indexOf('Vehicle Numbers');
+        if (vi === -1) { headers.push('Vehicle Numbers'); rows.forEach(r => r.push('')); }
+        current[headers.indexOf('Vehicle Numbers')] = numbers.join(', ');
+        renderVehicles(false);
+        render();
+        toast('Vehicle details saved.');
+      } catch (err) {
+        toast(err.message);
+        e.target.disabled = false;
+        e.target.textContent = 'Save vehicles';
+      }
+      return;
     }
     if (e.target.id === 'verifyBtn') {
       const name = $('#repName').value.trim();
