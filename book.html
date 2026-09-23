@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d52">
+<title>Book your stay | Swarga by the Bay</title>
+<meta name="description" content="Request a stay at Swarga by the Bay, a beachfront home at Kodi Beach, Udupi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css?v=8">
+</head>
+<body class="book-page">
+
+<header class="book-hero">
+  <div class="sky"><div class="sun"></div><div class="bird b1"></div></div>
+  <div class="book-hero-copy">
+    <p class="eyebrow">Kodi Beach · Udupi · Karnataka</p>
+    <h1>Swarga <span>by the Bay</span></h1>
+    <p class="lede">A peaceful beach home, steps from the sea. Tell us your dates and we'll confirm your stay.</p>
+  </div>
+  <svg class="waves" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+    <path class="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,220 L0,220 Z"/>
+    <path class="w2" d="M0,150 C240,110 480,190 720,150 C960,110 1200,180 1440,140 L1440,220 L0,220 Z"/>
+    <path class="w3" d="M0,180 C300,160 520,210 760,185 C1000,160 1240,205 1440,180 L1440,220 L0,220 Z"/>
+  </svg>
+</header>
+
+<main class="book-main">
+  <form id="bookForm" novalidate>
+    <section class="bcard">
+      <h2>When are you coming?</h2>
+      <div class="stay-card">
+        <div class="stay-col">
+          <label for="bIn">Check-in</label>
+          <input id="bIn" name="checkIn" type="date" required>
+          <small class="fine t-note">from <b id="bInTime">1:00 PM</b></small>
+        </div>
+        <div class="stay-mid"><span id="bNights">1 night</span></div>
+        <div class="stay-col">
+          <label for="bOut">Check-out</label>
+          <input id="bOut" name="checkOut" type="date" required>
+          <small class="fine t-note">by <b id="bOutTime">11:00 AM</b></small>
+        </div>
+      </div>
+
+      <h3>Who's coming?</h3>
+      <div class="stepper-list">
+        <div class="stepper-row">
+          <div><strong>Adults</strong><small>Age 18+</small></div>
+          <div class="stepper" data-name="adults" data-min="1" data-max="30"><button type="button" data-d="-1" aria-label="Fewer adults">−</button><output>2</output><button type="button" data-d="1" aria-label="More adults">+</button></div>
+          <input type="hidden" name="adults" value="2">
+        </div>
+        <div class="stepper-row">
+          <div><strong>Children</strong><small>Under 18</small></div>
+          <div class="stepper" data-name="children" data-min="0" data-max="30"><button type="button" data-d="-1" aria-label="Fewer children">−</button><output>0</output><button type="button" data-d="1" aria-label="More children">+</button></div>
+          <input type="hidden" name="children" value="0">
+        </div>
+      </div>
+    </section>
+
+    <section class="bcard" id="roomSec">
+      <h2>Choose your room</h2>
+      <p class="fine" id="roomHint">Checking availability…</p>
+      <div id="roomList" class="room-pick"></div>
+    </section>
+
+    <section class="bcard">
+      <h2>Your details</h2>
+      <div class="field"><input id="bName" name="guestName" required maxlength="120" autocomplete="name" placeholder=" "><label for="bName">Full name</label></div>
+      <div class="field"><input id="bMobile" name="mobile" type="tel" required pattern="\+?[0-9 ]{8,16}" inputmode="tel" autocomplete="tel" placeholder=" "><label for="bMobile">Mobile (WhatsApp preferred)</label></div>
+      <div class="field"><input id="bEmail" name="email" type="email" autocomplete="email" placeholder=" "><label for="bEmail">Email (optional)</label></div>
+      <div class="field"><textarea id="bReq" name="requests" maxlength="500" rows="3" placeholder=" "></textarea><label for="bReq">Special requests (optional)</label></div>
+      <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    </section>
+
+    <section class="bcard summary-card" id="estimate">
+      <div><small>Your stay</small><strong id="estDates">—</strong></div>
+      <div><small>Estimated total</small><strong id="estTotal">—</strong></div>
+      <p class="fine">This is a request. We'll confirm availability and payment details by phone or WhatsApp. No payment is taken online.</p>
+      <button type="submit" class="btn btn-sun wide" id="bSubmit">Request booking</button>
+    </section>
+  </form>
+
+  <section id="bDone" class="done-card hidden">
+    <div class="done-badge">✓</div>
+    <p class="eyebrow">Request received</p>
+    <h2>Thank you, <span id="dName"></span></h2>
+    <div class="ticket">
+      <div><small>Check-in</small><strong id="dIn"></strong></div>
+      <div class="ticket-sep">🌊</div>
+      <div><small>Check-out</small><strong id="dOut"></strong></div>
+    </div>
+    <p class="ref">Request <strong id="dRef"></strong></p>
+    <p class="fine">We'll contact you shortly to confirm. Keep this reference handy.</p>
+  </section>
+
+  <p class="foot-link"><a href="./">Already booked? Go to guest check-in →</a></p>
+</main>
+
+<div id="msg" class="toast" role="alert"></div>
+<script src="assets/config.js?v=8"></script>
+<script src="assets/book.js?v=8"></script>
+</body>
+</html>

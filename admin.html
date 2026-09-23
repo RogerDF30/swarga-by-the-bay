@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=7">
+<link rel="stylesheet" href="assets/style.css?v=8">
 </head>
 <body class="adm">
 
@@ -21,7 +21,7 @@
     <h1 class="login-title">Swarga <span>by the Bay</span></h1>
     <form id="loginForm" class="login-card" autocomplete="on">
       <h2>Welcome back</h2>
-      <p class="fine">Sign in to view guest check-ins.</p>
+      <p class="fine">Sign in to manage bookings, check-ins and rooms.</p>
       <div class="field"><input id="username" name="username" autocomplete="username" required placeholder=" "><label for="username">Username</label></div>
       <div class="field pw"><input id="password" name="password" type="password" autocomplete="current-password" required placeholder=" "><label for="password">Password</label><button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password">Show</button></div>
       <button type="submit" class="btn btn-sun wide" id="loginBtn">Sign in</button>
@@ -45,38 +45,106 @@
       </div>
     </div>
     <p class="eyebrow" id="greetDate"></p>
-    <h1>Guest check-ins</h1>
-    <div class="stats">
-      <button type="button" class="stat" data-view="arrivals"><small>Arrivals due</small><strong id="stArr">0</strong></button>
-      <button type="button" class="stat" data-view="inhouse"><small>In house</small><strong id="stHouse">0</strong></button>
-      <button type="button" class="stat" data-view="departures"><small>Departures due</small><strong id="stDep">0</strong></button>
-      <button type="button" class="stat warn" data-view="unverified"><small>Pending verification</small><strong id="stPending">0</strong></button>
+    <nav class="sec-nav" id="secNav">
+      <button type="button" data-sec="bookings" class="on">📅 Bookings</button>
+      <button type="button" data-sec="log">📖 Guest log</button>
+      <button type="button" data-sec="rooms">🛏️ Rooms</button>
+    </nav>
+    <div class="stats five">
+      <button type="button" class="stat warn" data-go="bookings:requests"><small>New requests</small><strong id="stReq">0</strong></button>
+      <button type="button" class="stat" data-go="bookings:arrivals"><small>Arrivals due</small><strong id="stArr">0</strong></button>
+      <button type="button" class="stat" data-go="bookings:inhouse"><small>In house</small><strong id="stHouse">0</strong></button>
+      <button type="button" class="stat" data-go="bookings:departures"><small>Departures due</small><strong id="stDep">0</strong></button>
+      <button type="button" class="stat" data-go="bookings:due"><small>Balance due</small><strong id="stDue">₹0</strong></button>
     </div>
   </header>
 
   <main class="dash-body">
-    <div class="toolbar2">
-      <div class="search"><span>🔍</span><input id="search" type="search" placeholder="Name, mobile, reference, ID or vehicle no."></div>
-      <button type="button" class="chip-btn dark" id="csvBtn">⬇ Export CSV</button>
-    </div>
-    <div class="tabs" id="viewTabs" role="tablist">
-      <button type="button" data-view="arrivals">Arrivals</button>
-      <button type="button" data-view="inhouse">In house</button>
-      <button type="button" data-view="departures">Departures</button>
-      <button type="button" data-view="checkedout">Checked out</button>
-      <button type="button" data-view="unverified">Unverified</button>
-      <button type="button" data-view="all" class="on">All</button>
-    </div>
-    <div class="range">
-      <label>Stay dates from <input type="date" id="fromDate"></label>
-      <label>to <input type="date" id="toDate"></label>
-      <button type="button" class="link-btn" id="clearFilters">Clear</button>
-    </div>
-    <p id="count" class="fine"></p>
-    <div id="rows" class="guest-list"></div>
-    <div id="empty" class="empty hidden"><span>🏖️</span><p>No check-ins match.</p></div>
+    <!-- BOOKINGS -->
+    <section id="sec-bookings" class="sec">
+      <div class="toolbar2">
+        <div class="search"><span>🔍</span><input id="bSearch" type="search" placeholder="Name, mobile, booking ref or room"></div>
+        <button type="button" class="btn btn-sun" id="newBooking">+ New booking</button>
+        <button type="button" class="chip-btn dark" id="bCsv">⬇ CSV</button>
+      </div>
+      <div class="tabs" id="bTabs">
+        <button type="button" data-v="requests">Requests</button>
+        <button type="button" data-v="arrivals">Arrivals</button>
+        <button type="button" data-v="inhouse">In house</button>
+        <button type="button" data-v="departures">Departures</button>
+        <button type="button" data-v="upcoming" class="on">Upcoming</button>
+        <button type="button" data-v="due">Balance due</button>
+        <button type="button" data-v="past">Past</button>
+        <button type="button" data-v="cancelled">Cancelled</button>
+        <button type="button" data-v="all">All</button>
+      </div>
+      <div class="range">
+        <label>Stay dates from <input type="date" id="bFrom"></label>
+        <label>to <input type="date" id="bTo"></label>
+        <button type="button" class="link-btn" id="bClear">Clear</button>
+      </div>
+      <p id="bCount" class="fine"></p>
+      <div id="bRows" class="guest-list"></div>
+      <div id="bEmpty" class="empty hidden"><span>📅</span><p>No bookings here.</p></div>
+    </section>
+
+    <!-- GUEST LOG -->
+    <section id="sec-log" class="sec hidden">
+      <div class="toolbar2">
+        <div class="search"><span>🔍</span><input id="search" type="search" placeholder="Name, mobile, reference, ID or vehicle no."></div>
+        <button type="button" class="chip-btn dark" id="csvBtn">⬇ CSV</button>
+      </div>
+      <div class="tabs" id="viewTabs" role="tablist">
+        <button type="button" data-view="arrivals">Arrivals</button>
+        <button type="button" data-view="inhouse">In house</button>
+        <button type="button" data-view="departures">Departures</button>
+        <button type="button" data-view="checkedout">Checked out</button>
+        <button type="button" data-view="unverified">Unverified</button>
+        <button type="button" data-view="all" class="on">All</button>
+      </div>
+      <div class="range">
+        <label>Stay dates from <input type="date" id="fromDate"></label>
+        <label>to <input type="date" id="toDate"></label>
+        <button type="button" class="link-btn" id="clearFilters">Clear</button>
+      </div>
+      <p id="count" class="fine"></p>
+      <div id="rows" class="guest-list"></div>
+      <div id="empty" class="empty hidden"><span>🏖️</span><p>No check-ins match.</p></div>
+    </section>
+
+    <!-- ROOMS -->
+    <section id="sec-rooms" class="sec hidden">
+      <div class="sec-head">
+        <h2>Rooms</h2>
+        <button type="button" class="btn btn-sun" id="newRoom">+ Add room</button>
+      </div>
+      <div id="roomCards" class="room-cards"></div>
+      <div class="sec-head occ-head">
+        <h2>Occupancy</h2>
+        <div class="occ-nav">
+          <button type="button" class="chip-btn dark" data-shift="-7">‹ Week</button>
+          <button type="button" class="chip-btn dark" data-shift="0">Today</button>
+          <button type="button" class="chip-btn dark" data-shift="7">Week ›</button>
+        </div>
+      </div>
+      <div class="occ-legend"><span class="lg c-Confirmed"></span>Confirmed <span class="lg c-Checkedin"></span>In house <span class="lg c-Requested"></span>Request <span class="lg c-maint"></span>Maintenance</div>
+      <div class="occ-wrap"><div id="occGrid" class="occ-grid"></div></div>
+    </section>
   </main>
 </div>
+
+<!-- ============ PANEL (bookings / rooms) ============ -->
+<dialog id="panel" class="drawer">
+  <div class="drawer-head">
+    <div>
+      <p class="eyebrow" id="pRef"></p>
+      <h2 id="pTitle"></h2>
+      <span id="pBadges"></span>
+    </div>
+    <button type="button" class="icon-btn" id="pClose" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="pBody"></div>
+</dialog>
 
 <!-- ============ DETAIL ============ -->
 <dialog id="detail" class="drawer">
@@ -93,6 +161,10 @@
     <section class="dsec stay-sec">
       <h3>🏠 Stay</h3>
       <div id="stayBlock"></div>
+    </section>
+    <section class="dsec hidden" id="bookingLinkSec">
+      <h3>📅 Booking</h3>
+      <div id="bookingLinkBlock"></div>
     </section>
     <section class="dsec hidden" id="historySec">
       <h3>↺ Previous stays</h3>
@@ -116,7 +188,7 @@
 
 <div id="msg" class="toast" role="alert"></div>
 
-<script src="assets/config.js?v=7"></script>
-<script src="assets/admin.js?v=7"></script>
+<script src="assets/config.js?v=8"></script>
+<script src="assets/admin.js?v=8"></script>
 </body>
 </html>

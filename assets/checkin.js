@@ -11,6 +11,8 @@
   const COUT = C.CHECKOUT_TIME || '11:00';
   let current = 0;
   let idFile = null;
+  let bookingId = '';
+  const setters = {};
 
   /* ---------- helpers ---------- */
   const pad = (n) => String(n).padStart(2, '0');
@@ -94,6 +96,7 @@
       out.classList.remove('pop'); void out.offsetWidth; out.classList.add('pop');
     });
     sync(+hidden.value);
+    setters[name] = (v) => sync(Math.min(max, Math.max(min, v)));
   });
 
   /* ---------- vehicle numbers ---------- */
@@ -301,6 +304,7 @@
         guestName: f.guestName.value, mobile: f.mobile.value, email: f.email.value,
         adults: f.adults.value, children: f.children.value, vehicles: f.vehicles.value,
         vehicleNumbers: plates(),
+        bookingId: bookingId,
         checkInDate: f.checkInDate.value, checkInTime: f.checkInTime.value,
         checkOutDate: f.checkOutDate.value, checkOutTime: f.checkOutTime.value,
         idType: f.idType.value, idNumber: f.idNumber.value,
@@ -351,4 +355,29 @@
       setTimeout(() => c.remove(), 5000);
     }
   }
+  /* ---------- booking link (?b=SBK-...) ---------- */
+  (async function prefillFromBooking() {
+    const code = (new URLSearchParams(location.search).get('b') || '').trim().toUpperCase();
+    if (!code) return;
+    const banner = $('#bookingBanner');
+    banner.classList.remove('hidden');
+    banner.textContent = 'Finding your booking…';
+    try {
+      const res = await fetch(C.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'booking', code }) }).then(r => r.json());
+      if (!res.ok) throw new Error(res.error);
+      const b = res.booking;
+      bookingId = b.id;
+      f.guestName.value = b.guestName || '';
+      if (b.checkIn) f.checkInDate.value = b.checkIn;
+      if (b.checkOut) f.checkOutDate.value = b.checkOut;
+      updateNights();
+      if (setters.adults) setters.adults(+b.adults || 1);
+      if (setters.children) setters.children(+b.children || 0);
+      banner.innerHTML = '<strong>Welcome, ' + esc((b.guestName || '').split(/\s+/)[0]) + '</strong> · Booking ' + esc(b.id) +
+        (b.rooms && b.rooms.length ? ' · ' + esc(b.rooms.join(', ')) : '') +
+        (b.alreadyCheckedIn ? '<br><small>A check-in form was already sent for this booking. Submitting again adds another record.</small>' : '');
+    } catch (e) {
+      banner.innerHTML = 'We couldn\'t find that booking link. You can still check in below.';
+    }
+  })();
 })();

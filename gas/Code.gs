@@ -23,7 +23,8 @@ const HEADERS = [
   'Declaration Name', 'Declaration Agreed',
   'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
   'Vehicle Numbers',   // columns below were appended later; keep new columns at the end
-  'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By'
+  'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By',
+  'Booking ID'
 ];
 
 /* ---------- one-time setup ---------- */
@@ -82,6 +83,18 @@ function doPost(e) {
       case 'verify': requireAdmin_(body.token); return json_(verify_(body.id, body.repName));
       case 'vehicles': requireAdmin_(body.token); return json_(updateVehicles_(body.id, body.count, body.numbers));
       case 'stay':   requireAdmin_(body.token); return json_(stay_(body.id, body.move, body.staff));
+      // bookings — public
+      case 'rooms':        return json_(publicRooms_());
+      case 'availability': return json_(availability_(body.from, body.to));
+      case 'request':      return json_(requestBooking_(body.data || {}));
+      case 'booking':      return json_(bookingForCheckin_(body.code));
+      // bookings — admin
+      case 'data':          requireAdmin_(body.token); return json_(adminData_());
+      case 'saveRoom':      requireAdmin_(body.token); return json_(saveRoom_(body.data || {}, body.staff));
+      case 'saveBooking':   requireAdmin_(body.token); return json_(saveBooking_(body.data || {}, body.staff));
+      case 'bookingStatus': requireAdmin_(body.token); return json_(bookingStatus_(body.id, body.status, body.reason, body.staff));
+      case 'addPayment':    requireAdmin_(body.token); return json_(addPayment_(body.data || {}, body.staff));
+      case 'markPaid':      requireAdmin_(body.token); return json_(markPaid_(body.data || {}, body.staff));
       default:       return json_({ ok: false, error: 'Unknown action' });
     }
   } catch (err) {
@@ -107,6 +120,7 @@ function submit_(d) {
     const id = 'SBB-' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyMMdd') + '-' +
                Utilities.getUuid().slice(0, 6).toUpperCase();
 
+    const bookingId = /^SBK-\d{6}-[A-Z0-9]{6}$/.test(String(d.bookingId || '').toUpperCase()) ? String(d.bookingId).toUpperCase() : '';
     let fileId = '';
     if (d.idPhoto && d.idPhoto.data) fileId = savePhoto_(id, d.guestName, d.idPhoto);
 
@@ -122,9 +136,11 @@ function submit_(d) {
       clean_(d.declarationName), 'Yes',
       '', '', 'Pending', clean_(d.userAgent).slice(0, 200),
       plates_(d.vehicleNumbers),
-      'Expected', '', '', '', ''
+      'Expected', '', '', '', '',
+      bookingId
     ];
     sheet_().appendRow(row);
+    if (bookingId) linkCheckin_(bookingId, id);
     return { ok: true, id: id };
   } finally {
     lock.releaseLock();
@@ -234,6 +250,7 @@ function stay_(id, move, staff) {
     } else {
       throw new Error('Unknown move.');
     }
+    syncBookingFromStay_(id, String(sh.getRange(r, c('Stay Status')).getValue()), who);
     return { ok: true };
   } finally {
     lock.releaseLock();
