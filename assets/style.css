@@ -175,6 +175,9 @@ input, select, button { font: inherit; }
 .contacts div { background: var(--foam); border-radius: 12px; padding: 10px; }
 .contacts small { display: block; color: var(--muted); font-size: .72rem; }
 .contacts span { font-weight: 700; font-size: .9rem; }
+.contacts b { display: block; }
+.contacts .tel { display: inline-block; margin-top: 4px; font-weight: 600; font-size: .85rem; color: var(--sea-2); text-decoration: none; }
+.contacts .tel:hover { text-decoration: underline; }
 
 /* summary + signature */
 .summary { background: linear-gradient(135deg, var(--sea), var(--sea-2)); color: #fff; border-radius: var(--radius); padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; box-shadow: var(--shadow); }

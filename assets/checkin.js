@@ -35,7 +35,14 @@
 
   /* ---------- config contacts ---------- */
   [['#cfgEmergency', C.PROPERTY_EMERGENCY], ['#cfgCaretaker', C.CARETAKER], ['#cfgHospital', C.NEAREST_HOSPITAL]]
-    .forEach(([id, v]) => { if (v) $(id).textContent = v; });
+    .forEach(([id, v]) => {
+      if (!v) return;
+      if (typeof v === 'string') { $(id).textContent = v; return; }
+      let html = '<b>' + esc(v.name || '') + '</b>';
+      if (v.phone) html += '<a class="tel" href="tel:' + esc(v.phone.replace(/[^+0-9]/g, '')) + '">📞 ' + esc(v.phone) + '</a>';
+      if (v.map) html += '<a class="tel" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.map) + '">📍 Directions</a>';
+      $(id).innerHTML = html;
+    });
 
   /* ---------- stay: dates + fixed times ---------- */
   const today = new Date();

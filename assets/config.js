@@ -7,8 +7,8 @@ window.SWARGA_CONFIG = {
   CHECKIN_TIME: '13:00',
   CHECKOUT_TIME: '11:00',
 
-  // Shown in the Emergency & Safety section. Leave '' to show a blank line.
-  PROPERTY_EMERGENCY: '',
-  CARETAKER: '',
-  NEAREST_HOSPITAL: ''
+  // Shown in the Emergency & Safety section. Phone numbers become tap-to-call links.
+  PROPERTY_EMERGENCY: { name: 'Chirag Shambu', phone: '+91 9448054505' },
+  CARETAKER: { name: 'Mrs. Jalja', phone: '+91 9108368198' },
+  NEAREST_HOSPITAL: { name: 'Kota Govt Hospital', map: 'Kota Government Hospital, Udupi, Karnataka' }
 };
