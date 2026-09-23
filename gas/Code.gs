@@ -4,7 +4,7 @@
  * Front end (Cloudways) POSTs JSON as text/plain to avoid CORS preflight.
  *
  * Script Properties (set by running setup() / setAdmin() once):
- *   ADMIN_USER, ADMIN_SALT, ADMIN_HASH, ID_FOLDER_ID
+ *   ADMIN_USER, ADMIN_SALT, ADMIN_HASH, ID_FOLDER_ID, MASTER_FOLDER_ID (optional)
  */
 
 const SHEET_NAME = 'CheckIns';
@@ -37,8 +37,12 @@ function setup() {
     sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
   }
   const props = PropertiesService.getScriptProperties();
+  // Optional MASTER_FOLDER_ID: Sheet + ID proofs folder live inside it.
+  const masterId = props.getProperty('MASTER_FOLDER_ID');
+  const master = masterId ? DriveApp.getFolderById(masterId) : DriveApp.getRootFolder();
+  if (masterId) DriveApp.getFileById(ss.getId()).moveTo(master);
   if (!props.getProperty('ID_FOLDER_ID')) {
-    const folder = DriveApp.createFolder('Swarga by the Bay — Guest ID Proofs');
+    const folder = master.createFolder('Guest ID Proofs');
     props.setProperty('ID_FOLDER_ID', folder.getId());
   }
   Logger.log('Setup done. Now edit and run setAdmin().');
