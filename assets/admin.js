@@ -881,8 +881,12 @@
   }
   async function openSettings(tab) {
     if (tab) stab = tab;
-    if (STABS.find(t => t[0] === stab)[2] && !isSuper()) stab = 'account';
     showSection('settings');
+    if (!me) {
+      $('#sBody').innerHTML = '<div class="skeleton"></div>';
+      try { setMe((await call('me')).user); } catch (err) { return toast(err.message); }
+    }
+    if (STABS.find(t => t[0] === stab)[2] && !isSuper()) stab = 'account';
     renderSTabs();
     $('#sBody').innerHTML = '<div class="skeleton"></div>';
     try {
