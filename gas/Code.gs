@@ -84,6 +84,7 @@ function doPost(e) {
       case 'availability': return json_(availability_(body.from, body.to));
       case 'request':      return json_(requestBooking_(body.data || {}));
       case 'booking':      return json_(bookingForCheckin_(body.code));
+      case 'roomPhoto':    return json_(roomPhoto_(body.id, body.token));
     }
 
     // Super admin only
@@ -116,6 +117,8 @@ function doPost(e) {
       stay:           (b, s) => stay_(b.id, b.move, s),
       data:           (b, s) => Object.assign(adminData_(), { user: { username: s.u, name: s.name, role: s.role } }),
       saveRoom:       (b, s) => saveRoom_(b.data || {}, s),
+      addRoomPhoto:   (b, s) => addRoomPhoto_(b.id, b.photo, s),
+      roomPhotoOp:    (b, s) => roomPhotoAction_(b.id, b.fileId, b.op, s),
       saveBooking:    (b, s) => saveBooking_(b.data || {}, s),
       bookingStatus:  (b, s) => bookingStatus_(b.id, b.status, b.reason, s, b.notifyGuest),
       addPayment:     (b, s) => addPayment_(b.data || {}, s),

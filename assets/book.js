@@ -22,6 +22,44 @@
     return j;
   }
 
+  /* room photos */
+  const photoData = {};
+  function photoImg(p, alt, loading, w) {
+    return p.url ? '<img src="' + esc(p.url.replace('=w1600', '=w' + w)) + '" alt="' + esc(alt) + '" loading="' + loading + '">'
+      : '<img data-pid="' + esc(p.id) + '" alt="' + esc(alt) + '">';
+  }
+  async function hydrate(root) {
+    for (const img of $$('img[data-pid]', root)) {
+      const id = img.dataset.pid;
+      try {
+        if (!photoData[id]) { const r = await api('roomPhoto', { id }); photoData[id] = 'data:' + r.mime + ';base64,' + r.data; }
+        img.src = photoData[id]; img.removeAttribute('data-pid');
+      } catch (e) { /* skip */ }
+    }
+  }
+  let lbRoom = null, lbI = 0;
+  function openLightbox(roomId, i) {
+    lbRoom = rooms.find(r => r.id === roomId); lbI = i;
+    showLb();
+    if (!$('#lightbox').open) $('#lightbox').showModal();
+  }
+  function showLb() {
+    const ph = lbRoom.photos, p = ph[(lbI + ph.length) % ph.length];
+    lbI = (lbI + ph.length) % ph.length;
+    $('#lbImg').innerHTML = photoImg(p, lbRoom.name + ' photo ' + (lbI + 1), 'eager', 1600);
+    $('#lbCap').textContent = lbRoom.name + ' · ' + (lbI + 1) + ' of ' + ph.length;
+    $$('.lb-nav').forEach(b => b.classList.toggle('hidden', ph.length < 2));
+    hydrate($('#lbImg'));
+  }
+  $('#lbPrev').addEventListener('click', () => { lbI--; showLb(); });
+  $('#lbNext').addEventListener('click', () => { lbI++; showLb(); });
+  $('#lbClose').addEventListener('click', () => $('#lightbox').close());
+  $('#lightbox').addEventListener('click', e => { if (e.target === $('#lightbox')) $('#lightbox').close(); });
+  $('#lightbox').addEventListener('keydown', e => { if (e.key === 'ArrowLeft') { lbI--; showLb(); } if (e.key === 'ArrowRight') { lbI++; showLb(); } });
+  let tx = null;
+  $('#lightbox').addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  $('#lightbox').addEventListener('touchend', e => { if (tx == null) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 40) { lbI += dx < 0 ? 1 : -1; showLb(); } tx = null; });
+
   /* dates */
   const today = new Date();
   f.checkIn.min = iso(today);
@@ -95,17 +133,24 @@
     $('#roomList').innerHTML = rooms.map(r => {
       const free = !available || available.has(r.id);
       const on = picked.has(r.id);
-      return '<button type="button" class="room-opt' + (on ? ' on' : '') + (free ? '' : ' off') + '" data-id="' + esc(r.id) + '"' + (free ? '' : ' disabled') + '>' +
+      const ph = r.photos || [];
+      return '<div class="room-box' + (ph.length ? ' has-ph' : '') + (on ? ' on' : '') + (free ? '' : ' off') + '">' + (ph.length ?
+        '<div class="ro-gal"><div class="ro-track">' + ph.map((p, i) => '<button type="button" class="ro-ph" data-room="' + esc(r.id) + '" data-i="' + i + '" aria-label="View photo ' + (i + 1) + ' of ' + esc(r.name) + '">' + photoImg(p, r.name, i === 0 ? 'eager' : 'lazy', 900) + '</button>').join('') + '</div>' +
+        (ph.length > 1 ? '<span class="ro-count">📷 ' + ph.length + '</span>' : '') + '</div>' : '') +
+        '<button type="button" class="room-opt' + (on ? ' on' : '') + (free ? '' : ' off') + '" data-id="' + esc(r.id) + '"' + (free ? '' : ' disabled') + '>' +
         '<span class="ro-top"><strong>' + esc(r.name) + '</strong>' + (r.rate ? '<b>' + inr(r.rate) + '<small>/night</small></b>' : '') + '</span>' +
         '<small>' + esc([r.type, r.capacity ? 'Sleeps ' + r.capacity : ''].filter(Boolean).join(' · ')) + '</small>' +
         (r.description ? '<small class="ro-desc">' + esc(r.description) + '</small>' : '') +
-        '<span class="ro-tag">' + (free ? (on ? '✓ Selected' : 'Available') : 'Booked') + '</span></button>';
+        '<span class="ro-tag">' + (free ? (on ? '✓ Selected' : 'Available') : 'Booked') + '</span></button></div>';
     }).join('');
+    hydrate($('#roomList'));
     const cap = [...picked].reduce((s, id) => s + ((rooms.find(r => r.id === id) || {}).capacity || 0), 0);
     if (picked.size && cap && guests > cap) $('#roomHint').textContent = 'Selected rooms sleep ' + cap + '. You have ' + guests + ' guests — add a room or we\'ll suggest options.';
     estimate();
   }
   $('#roomList').addEventListener('click', e => {
+    const ph = e.target.closest('.ro-ph');
+    if (ph) return openLightbox(ph.dataset.room, +ph.dataset.i);
     const b = e.target.closest('.room-opt'); if (!b || b.disabled) return;
     picked.has(b.dataset.id) ? picked.delete(b.dataset.id) : picked.add(b.dataset.id);
     renderRooms();

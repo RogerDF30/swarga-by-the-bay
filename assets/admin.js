@@ -793,12 +793,15 @@
     $('#roomCards').innerHTML = rooms.length ? rooms.map(r => {
       const occ = db.bookings.find(b => b.Status === 'Checked in' && roomIds(b['Room IDs']).indexOf(r['Room ID']) > -1);
       const next = db.bookings.filter(b => b.Status === 'Confirmed' && bIn(b) >= t && roomIds(b['Room IDs']).indexOf(r['Room ID']) > -1).sort((a, b) => bIn(a).localeCompare(bIn(b)))[0];
+      const cover = photoRefs(r.Photos)[0];
       return '<button type="button" class="room-card" data-rid="' + esc(r['Room ID']) + '">' +
+        (cover ? '<span class="rc-img">' + imgTag(cover, r.Name) + '</span>' : '<span class="rc-img empty">📷 Add photos</span>') +
         '<span class="rc-top"><strong>' + esc(r.Name) + '</strong><span class="badge rs-' + slug(r.Status) + '">' + esc(r.Status) + '</span></span>' +
         '<small>' + esc([r.Type, 'Sleeps ' + (r.Capacity || '?')].filter(Boolean).join(' · ')) + '</small>' +
         '<b class="rc-rate">' + inr(r.Rate) + '<small>/night</small></b>' +
         '<span class="rc-now">' + (occ ? '🟢 In house: ' + esc(occ['Guest Name']) + ' until ' + esc(niceDate(occ['Check-out Date'])) : next ? '📅 Next: ' + esc(next['Guest Name']) + ' · ' + esc(niceDate(next['Check-in Date'])) : '✨ Free') + '</span></button>';
     }).join('') : '<div class="empty"><span>🛏️</span><p>No rooms yet. Add your first room.</p></div>';
+    hydratePhotos($('#roomCards'));
     renderOcc();
   }
   function renderOcc() {
@@ -846,15 +849,100 @@
       '<div class="field"><textarea id="rfDesc" rows="2" maxlength="300" placeholder=" ">' + esc(r.Description || '') + '</textarea><label for="rfDesc">Description (shown to guests)</label></div>' +
       '<div class="field"><textarea id="rfNotes" rows="2" maxlength="300" placeholder=" ">' + esc(r['Internal Notes'] || '') + '</textarea><label for="rfNotes">Internal notes</label></div>' +
       '<p class="fine">Only <b>Active</b> rooms appear on the booking page. Maintenance or Inactive rooms stay out of availability.</p>' +
+      '<h3 class="mini">Photos <small>up to 6 · the first is the cover</small></h3>' +
+      (editRoomId ? '<div id="rfPhotos" class="ph-grid"></div><label class="chip-btn dark ph-add"><input type="file" id="rfPhotoIn" accept="image/jpeg,image/png,image/webp" multiple hidden>+ Add photos</label>'
+        : '<p class="fine">Save the room first, then add photos.</p>') +
       '<div class="act-row end"><button type="button" class="chip-btn dark" id="rfCancel">Cancel</button><button type="button" class="btn btn-sun" id="rfSave">' + (editRoomId ? 'Save room' : 'Add room') + '</button></div>';
+    roomPhotos = photoRefs(r.Photos);
     openPanel('roomForm', editRoomId || 'New room', editRoomId ? r.Name : 'Add a room', editRoomId ? '<span class="badge rs-' + slug(r.Status) + '">' + esc(r.Status) + '</span>' : '', body);
     $('#pBody').scrollTop = 0;
+    if (editRoomId) renderRoomPhotos();
   }
   function saveRoomForm(btn) {
     const data = { id: editRoomId, name: $('#rfName').value, type: $('#rfType').value, status: $('#rfStatus').value, capacity: $('#rfCap').value, rate: $('#rfRate').value, sort: $('#rfSort').value, description: $('#rfDesc').value, notes: $('#rfNotes').value };
     if (!data.name.trim()) return toast('Enter a room name.');
-    return busy(btn, async () => { await call('saveRoom', { data }); toast(editRoomId ? 'Room saved.' : 'Room added.'); $('#panel').close(); await quietReload(); });
+    return busy(btn, async () => {
+      const res = await call('saveRoom', { data });
+      await quietReload();
+      if (editRoomId) { toast('Room saved.'); return $('#panel').close(); }
+      toast('Room added. Now add photos.');
+      roomForm(db.rooms.find(x => x['Room ID'] === res.id));
+      $('#rfPhotos').scrollIntoView({ block: 'center' });
+    });
   }
+
+  /* ---------- room photos ---------- */
+  let roomPhotos = [];
+  const photoCache = {};
+  function photoRefs(v) {
+    return String(v || '').split(',').map(x => x.trim()).filter(Boolean).map(p => {
+      const priv = p.indexOf('p:') === 0, id = priv ? p.slice(2) : p;
+      return { id: id, url: priv ? '' : 'https://lh3.googleusercontent.com/d/' + id + '=w1600' };
+    });
+  }
+  const imgTag = (ph, alt) => ph.url
+    ? '<img src="' + esc(ph.url.replace('=w1600', '=w600')) + '" alt="' + esc(alt || '') + '" loading="lazy">'
+    : '<img data-pid="' + esc(ph.id) + '" alt="' + esc(alt || '') + '">';
+  async function hydratePhotos(root) {
+    for (const img of root.querySelectorAll('img[data-pid]')) {
+      const id = img.dataset.pid;
+      try {
+        if (!photoCache[id]) { const r = await call('roomPhoto', { id }); photoCache[id] = 'data:' + r.mime + ';base64,' + r.data; }
+        img.src = photoCache[id]; img.removeAttribute('data-pid');
+      } catch (e) { /* leave blank */ }
+    }
+  }
+  function renderRoomPhotos() {
+    const box = $('#rfPhotos'); if (!box) return;
+    box.innerHTML = roomPhotos.length ? roomPhotos.map((ph, i) =>
+      '<div class="ph">' + imgTag(ph, 'Room photo ' + (i + 1)) +
+      (i === 0 ? '<span class="ph-cover">Cover</span>' : '<button type="button" class="ph-btn" data-ph-op="cover" data-fid="' + esc(ph.id) + '" title="Make cover">★</button>') +
+      '<button type="button" class="ph-btn del" data-ph-op="remove" data-fid="' + esc(ph.id) + '" title="Remove photo">✕</button></div>').join('')
+      : '<p class="fine">No photos yet.</p>';
+    $('.ph-add').classList.toggle('hidden', roomPhotos.length >= 6);
+    hydratePhotos(box);
+  }
+  function shrinkImage(file, max) {
+    return new Promise((resolve, reject) => {
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve({ mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.84).split(',')[1] });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(file.name + ' is not a readable image.')); };
+      img.src = url;
+    });
+  }
+  $('#pBody').addEventListener('change', async e => {
+    if (e.target.id !== 'rfPhotoIn') return;
+    const files = [...e.target.files].slice(0, 6 - roomPhotos.length);
+    e.target.value = '';
+    const label = $('.ph-add');
+    for (let i = 0; i < files.length; i++) {
+      label.classList.add('busy'); label.lastChild.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '…';
+      try {
+        const photo = await shrinkImage(files[i], 1600);
+        const r = await call('addRoomPhoto', { id: editRoomId, photo });
+        roomPhotos = r.photos;
+      } catch (err) { toast(err.message); break; }
+    }
+    label.classList.remove('busy'); label.lastChild.textContent = '+ Add photos';
+    renderRoomPhotos();
+    quietReload();
+  });
+  $('#pBody').addEventListener('click', async e => {
+    const b = e.target.closest('[data-ph-op]');
+    if (!b || panelMode !== 'roomForm') return;
+    const op = b.dataset.phOp;
+    if (op === 'remove' && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Remove?'; b.classList.add('armed'); setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = '✕'; b.classList.remove('armed'); } }, 4000); return; }
+    b.disabled = true;
+    try { const r = await call('roomPhotoOp', { id: editRoomId, fileId: b.dataset.fid, op }); roomPhotos = r.photos; renderRoomPhotos(); toast(op === 'cover' ? 'Cover photo set.' : 'Photo removed.'); quietReload(); }
+    catch (err) { toast(err.message); b.disabled = false; }
+  });
 
   function notifyBox(b) {
     return b.Email ? '<label class="chk-line"><input type="checkbox" id="pNotify" checked> Email the guest about this change</label>' : '';

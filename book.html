@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=9">
+<link rel="stylesheet" href="assets/style.css?v=11">
 </head>
 <body class="book-page">
 
@@ -100,7 +100,14 @@
 </main>
 
 <div id="msg" class="toast" role="alert"></div>
-<script src="assets/config.js?v=9"></script>
-<script src="assets/book.js?v=9"></script>
+<dialog id="lightbox" class="lightbox" aria-label="Room photos">
+  <button type="button" class="lb-close" id="lbClose" aria-label="Close">✕</button>
+  <button type="button" class="lb-nav prev" id="lbPrev" aria-label="Previous photo">‹</button>
+  <figure><div id="lbImg"></div><figcaption id="lbCap"></figcaption></figure>
+  <button type="button" class="lb-nav next" id="lbNext" aria-label="Next photo">›</button>
+</dialog>
+
+<script src="assets/config.js?v=11"></script>
+<script src="assets/book.js?v=11"></script>
 </body>
 </html>

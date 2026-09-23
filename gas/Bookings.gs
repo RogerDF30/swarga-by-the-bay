@@ -19,7 +19,7 @@ const BOOKING_HEADERS = [
   'Special Requests', 'Internal Notes', 'Check-in Ref',
   'Cancel Reason', 'Updated At', 'Updated By'
 ];
-const ROOM_HEADERS = ['Room ID', 'Name', 'Type', 'Capacity', 'Rate', 'Status', 'Description', 'Internal Notes', 'Sort'];
+const ROOM_HEADERS = ['Room ID', 'Name', 'Type', 'Capacity', 'Rate', 'Status', 'Description', 'Internal Notes', 'Sort', 'Photos'];
 const PAYMENT_HEADERS = ['Payment ID', 'Booking ID', 'Recorded At', 'Kind', 'Amount', 'Mode', 'Reference', 'Note', 'Recorded By'];
 
 const BLOCKING = ['Confirmed', 'Checked in'];
@@ -88,7 +88,7 @@ function todayIso_() { return Utilities.formatDate(new Date(), 'Asia/Kolkata', '
 function publicRooms_() {
   const rooms = readAll_(ROOMS, ROOM_HEADERS).filter(r => r.Status === 'Active')
     .sort((a, b) => (Number(a.Sort) || 99) - (Number(b.Sort) || 99))
-    .map(r => ({ id: r['Room ID'], name: r.Name, type: r.Type, capacity: Number(r.Capacity) || 0, rate: money_(r.Rate), description: r.Description }));
+    .map(r => ({ id: r['Room ID'], name: r.Name, type: r.Type, capacity: Number(r.Capacity) || 0, rate: money_(r.Rate), description: r.Description, photos: photoList_(r.Photos).map(photoRef_) }));
   return { ok: true, rooms: rooms };
 }
 
@@ -412,3 +412,77 @@ function adminData_() {
   };
 }
 function strip_(o) { const c = Object.assign({}, o); delete c._row; return c; }
+
+/* ---------- room photos ---------- */
+// Photos column: comma-separated Drive file IDs, first is the cover.
+// "p:<id>" marks a file that could not be shared publicly; it is served through the roomPhoto action instead.
+const MAX_ROOM_PHOTOS = 6;
+const MAX_ROOM_PHOTO_BYTES = 3 * 1024 * 1024;
+
+function photoList_(v) { return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
+function photoRef_(p) {
+  const priv = p.indexOf('p:') === 0, id = priv ? p.slice(2) : p;
+  return { id: id, url: priv ? '' : 'https://lh3.googleusercontent.com/d/' + id + '=w1600' };
+}
+
+function roomPhotoFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('ROOM_PHOTO_FOLDER_ID');
+  if (id) return DriveApp.getFolderById(id);
+  const masterId = props.getProperty('MASTER_FOLDER_ID');
+  const parent = masterId ? DriveApp.getFolderById(masterId) : DriveApp.getRootFolder();
+  const folder = parent.createFolder('Room Photos');
+  props.setProperty('ROOM_PHOTO_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function addRoomPhoto_(roomId, photo, sess) {
+  if (!photo || !photo.data) throw new Error('Choose a photo.');
+  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(photo.mime) === -1) throw new Error('Photos must be JPG, PNG or WebP.');
+  const bytes = Utilities.base64Decode(photo.data);
+  if (bytes.length > MAX_ROOM_PHOTO_BYTES) throw new Error('Photo is larger than 3 MB.');
+  const r = findBy_(ROOMS, ROOM_HEADERS, roomId);
+  const list = photoList_(r.Photos);
+  if (list.length >= MAX_ROOM_PHOTOS) throw new Error('A room can have up to ' + MAX_ROOM_PHOTOS + ' photos.');
+  const ext = photo.mime === 'image/png' ? 'png' : photo.mime === 'image/webp' ? 'webp' : 'jpg';
+  const file = roomPhotoFolder_().createFile(Utilities.newBlob(bytes, photo.mime, roomId + '_' + clean_(r.Name).replace(/[^\w]+/g, '_') + '_' + Date.now() + '.' + ext));
+  let ref = file.getId();
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }
+  catch (e) { ref = 'p:' + ref; } // domain policy blocks public links: serve through the app
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const fresh = photoList_(findBy_(ROOMS, ROOM_HEADERS, roomId).Photos);
+    fresh.push(ref);
+    writeFields_(ROOMS, ROOM_HEADERS, r._row, { 'Photos': fresh.join(', ') });
+    audit_(sess, 'room.photo.add', roomId, r.Name + (ref.indexOf('p:') === 0 ? ' (private)' : ''));
+    return { ok: true, photos: fresh.map(photoRef_) };
+  } finally { lock.releaseLock(); }
+}
+
+function roomPhotoAction_(roomId, fileId, op, sess) {
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const r = findBy_(ROOMS, ROOM_HEADERS, roomId);
+    const list = photoList_(r.Photos);
+    const i = list.findIndex(p => p === fileId || p === 'p:' + fileId);
+    if (i === -1) throw new Error('Photo not found.');
+    const item = list.splice(i, 1)[0];
+    if (op === 'cover') list.unshift(item);
+    else if (op === 'remove') { try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {} }
+    else throw new Error('Unknown photo action.');
+    writeFields_(ROOMS, ROOM_HEADERS, r._row, { 'Photos': list.join(', ') });
+    audit_(sess, 'room.photo.' + op, roomId, r.Name);
+    return { ok: true, photos: list.map(photoRef_) };
+  } finally { lock.releaseLock(); }
+}
+
+/** Public: only serves files that belong to an active room's photo list. */
+function roomPhoto_(fileId, token) {
+  fileId = String(fileId || '');
+  let staff = false;
+  if (token) { try { requireAdmin_(token); staff = true; } catch (e) {} }
+  const owned = readAll_(ROOMS, ROOM_HEADERS).some(r => (staff || r.Status === 'Active') && photoList_(r.Photos).some(p => p === fileId || p === 'p:' + fileId));
+  if (!owned) throw new Error('Photo not found.');
+  const blob = DriveApp.getFileById(fileId).getBlob();
+  return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
