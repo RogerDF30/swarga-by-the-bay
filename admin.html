@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin | Swarga by the Bay</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="hero">
+  <h1>SWARGA BY THE BAY</h1>
+  <p>Guest Check-In Admin</p>
+</header>
+
+<main style="max-width:1200px">
+  <!-- Login -->
+  <section id="loginView" class="card" style="max-width:420px;margin:40px auto">
+    <h2>Admin Login</h2>
+    <form id="loginForm">
+      <label>Username</label><input name="username" autocomplete="username" required>
+      <label style="margin-top:12px">Password</label><input name="password" type="password" autocomplete="current-password" required>
+      <div id="loginMsg" class="msg" role="alert"></div>
+      <p><button type="submit" id="loginBtn">Log in</button></p>
+    </form>
+  </section>
+
+  <!-- List -->
+  <section id="listView" class="hidden">
+    <div class="toolbar">
+      <input id="search" placeholder="Search name, mobile, ID, reference">
+      <select id="statusFilter" style="width:auto">
+        <option value="">All statuses</option><option>Pending</option><option>Verified</option>
+      </select>
+      <button id="refreshBtn" class="ghost" type="button">Refresh</button>
+      <button id="csvBtn" class="ghost" type="button">Export CSV</button>
+      <button id="logoutBtn" type="button">Log out</button>
+    </div>
+    <p id="count" style="color:var(--muted);margin:0 0 8px"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Reference</th><th>Submitted</th><th>Guest</th><th>Mobile</th><th>Guests</th><th>Check-in</th><th>Check-out</th><th>Status</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail">
+  <div class="dlg-head"><strong id="dlgTitle"></strong><button type="button" class="ghost" style="color:#fff;border-color:#fff" id="closeDlg">Close</button></div>
+  <div class="dlg-body">
+    <dl id="dlgFields"></dl>
+    <h3>ID Proof</h3>
+    <div id="idProof"><button type="button" class="ghost" id="loadPhoto">View ID proof</button></div>
+    <h3>Property Representative</h3>
+    <div id="verifyBlock">
+      <label>Representative Name</label><input id="repName" maxlength="120">
+      <div id="verifyMsg" class="msg" role="alert"></div>
+      <p><button type="button" id="verifyBtn">Mark as Verified</button></p>
+    </div>
+  </div>
+</dialog>
+
+<script src="assets/config.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>

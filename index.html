@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guest Check-In | Swarga by the Bay</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="hero">
+  <h1>SWARGA BY THE BAY</h1>
+  <p>Guest Check-In, House Rules &amp; Sea Safety Acceptance Form</p>
+  <p>Kodi Beach, Udupi District, Karnataka</p>
+</header>
+
+<main>
+<form id="checkin" novalidate>
+
+<section class="card">
+  <p>Thank you for choosing Swarga by the Bay. Our property is located directly beside the sea and is designed as a peaceful beach home. For the safety, comfort and enjoyment of all our guests, please read and acknowledge the following guidelines.</p>
+</section>
+
+<!-- 1. GUEST DETAILS -->
+<section class="card">
+  <h2>1. Guest Details</h2>
+  <div class="grid">
+    <div class="full"><label>Guest Name <span class="req">*</span></label><input name="guestName" required maxlength="120" autocomplete="name"></div>
+    <div><label>Mobile No. <span class="req">*</span></label><input name="mobile" type="tel" required pattern="\+?[0-9 ]{8,16}" title="Digits only, optional + country code" autocomplete="tel"></div>
+    <div><label>Email</label><input name="email" type="email" autocomplete="email"></div>
+    <div><label>Adults <span class="req">*</span></label><input name="adults" type="number" min="1" max="50" required></div>
+    <div><label>Children</label><input name="children" type="number" min="0" max="50" value="0"></div>
+    <div><label>Number of Vehicles</label><input name="vehicles" type="number" min="0" max="20" value="0"></div>
+    <div></div>
+    <div><label>Check-in Date <span class="req">*</span></label><input name="checkInDate" type="date" required></div>
+    <div><label>Check-in Time</label><input name="checkInTime" type="time"></div>
+    <div><label>Check-out Date <span class="req">*</span></label><input name="checkOutDate" type="date" required></div>
+    <div><label>Check-out Time</label><input name="checkOutTime" type="time"></div>
+    <div><label>ID Proof Type <span class="req">*</span></label>
+      <select name="idType" required>
+        <option value="">Select</option>
+        <option>Aadhaar</option><option>Passport</option><option>Driving Licence</option>
+        <option>Voter ID</option><option>PAN</option><option>Other</option>
+      </select></div>
+    <div><label>ID Proof No. <span class="req">*</span></label><input name="idNumber" required maxlength="40"></div>
+    <div class="full"><label>ID Proof Photo (JPG, PNG or PDF, max 5 MB)</label><input name="idPhoto" type="file" accept="image/jpeg,image/png,application/pdf" capture="environment"></div>
+    <div><label>Emergency Contact Name <span class="req">*</span></label><input name="emergencyName" required maxlength="120"></div>
+    <div><label>Emergency Contact No. <span class="req">*</span></label><input name="emergencyPhone" type="tel" required pattern="\+?[0-9 ]{8,16}" title="Digits only, optional + country code"></div>
+  </div>
+</section>
+
+<!-- 2. HOUSE RULES -->
+<section class="card">
+  <h2>2. House Rules</h2>
+  <strong>General</strong>
+  <ol>
+    <li>Check-in and check-out times must be followed unless prior permission is obtained.</li>
+    <li>The property is provided for the number of guests declared at the time of booking. Additional guests require prior approval.</li>
+    <li>Guests are requested to maintain cleanliness and take care of the property, furniture, appliances and other facilities.</li>
+    <li>Any damage, breakage or loss caused by a guest will be chargeable.</li>
+    <li>Please switch off lights, air conditioners, fans and electrical appliances when not required.</li>
+    <li>Smoking is not permitted inside rooms or enclosed areas. Cigarette butts must not be discarded on the beach or property.</li>
+    <li>Alcohol consumption, where permitted by law, must be responsible and must not disturb other guests or neighbours.</li>
+    <li>Loud music, parties, shouting or activities disturbing neighbours or other guests are not permitted.</li>
+    <li>Illegal activities, possession or use of prohibited substances, weapons or other unlawful activities are strictly prohibited.</li>
+    <li>Guests are responsible for their personal belongings. The management is not responsible for loss or damage to valuables left unattended.</li>
+    <li>Children must be supervised by their parents/guardians at all times, particularly around the beach, balconies, stairs and water.</li>
+    <li>Pets are allowed only with prior approval and must be supervised by their owners. Pet owners are responsible for cleaning up after their pets.</li>
+    <li>Cooking, where kitchen facilities are provided, must be done safely. Gas/electrical appliances must be switched off after use.</li>
+    <li>Do not move furniture or outdoor equipment to the beach without permission.</li>
+    <li>Please do not take property items, towels, furniture or equipment onto the sea or beach unless specifically permitted.</li>
+  </ol>
+  <label class="check"><input type="checkbox" name="ackHouse" required> I/We have read and agree to the House Rules.</label>
+</section>
+
+<!-- 3. BEACH & SEA SAFETY -->
+<section class="card">
+  <h2>3. Beach &amp; Sea Safety</h2>
+  <p class="note"><strong>IMPORTANT:</strong> Swarga by the Bay is a beachfront property. The sea is a natural environment and conditions can change rapidly. Guests acknowledge that entering the sea is at their own risk.</p>
+  <ol>
+    <li>There may be strong currents, waves, sudden changes in water depth and underwater hazards.</li>
+    <li>Swimming or entering the sea should be avoided during rough weather, heavy rain, storms, high waves or strong currents.</li>
+    <li>Do not enter the sea after consuming alcohol or any substance that may impair judgment or coordination.</li>
+    <li>Children must never enter the sea or play near the water without direct adult supervision.</li>
+    <li>Never swim alone. Stay within your ability and remain close to shore.</li>
+    <li>Do not venture into deeper water, rocks, fishing areas or restricted areas.</li>
+    <li>Do not attempt to rescue another person from the sea by entering the water unless you are trained to do so. Call for professional assistance immediately.</li>
+    <li>Guests should follow warnings from local authorities, lifeguards or property staff regarding sea conditions.</li>
+    <li>Beach toys, bodyboards, life jackets or other equipment provided by the property must be used responsibly and only for their intended purpose.</li>
+    <li>Life jackets are not a substitute for supervision or swimming ability.</li>
+    <li>Equipment must be returned after use and any damage must be reported immediately.</li>
+    <li>Avoid the sea during lightning, thunderstorms or other dangerous weather conditions.</li>
+    <li>At night, guests are advised not to enter the sea, as visibility and awareness of currents and hazards are significantly reduced.</li>
+    <li>Do not consume food or alcohol while swimming or engaging in water activities.</li>
+    <li>Please be alert for sharp objects, shells, rocks, fishing equipment and other hazards on the beach.</li>
+    <li>The beach is a natural environment. Guests should not disturb marine life or remove shells, creatures or other natural material.</li>
+  </ol>
+  <label class="check"><input type="checkbox" name="ackSea" required> I/We have read and understood the Beach &amp; Sea Safety guidelines and accept that entering the sea is at my/our own risk.</label>
+</section>
+
+<!-- 4. EMERGENCY & SAFETY -->
+<section class="card">
+  <h2>4. Emergency &amp; Safety</h2>
+  <p>In case of an emergency:</p>
+  <ul>
+    <li>Immediately inform the property caretaker/management.</li>
+    <li>Call <strong>112</strong> for emergency assistance where required.</li>
+    <li>For a medical emergency, seek professional medical assistance immediately.</li>
+    <li>In case of a fire, evacuate the building and inform the caretaker/management immediately.</li>
+    <li>Do not attempt to handle dangerous electrical, gas or fire-related situations unless you are trained to do so.</li>
+  </ul>
+  <dl>
+    <dt>Property Emergency Contact</dt><dd id="cfgEmergency">—</dd>
+    <dt>Caretaker Contact</dt><dd id="cfgCaretaker">—</dd>
+    <dt>Nearest Hospital/Medical Facility</dt><dd id="cfgHospital">—</dd>
+  </dl>
+</section>
+
+<!-- 5. WEATHER -->
+<section class="card">
+  <h2>5. Weather &amp; Natural Conditions</h2>
+  <p>Guests acknowledge that beachfront properties are exposed to natural conditions including:</p>
+  <ul>
+    <li>Strong winds</li><li>Heavy rain and storms</li><li>High waves and strong currents</li>
+    <li>Lightning and thunderstorms</li><li>Temporary power or internet interruptions</li>
+    <li>Sand, salt and moisture</li><li>Insects and other natural wildlife</li>
+  </ul>
+  <p>Such natural conditions are beyond the reasonable control of the property management.</p>
+  <p>Management may restrict beach or sea access whenever conditions are considered unsafe.</p>
+  <label class="check"><input type="checkbox" name="ackWeather" required> I/We acknowledge the Weather &amp; Natural Conditions.</label>
+</section>
+
+<!-- 6. RESPECT -->
+<section class="card">
+  <h2>6. Respect for the Property &amp; Environment</h2>
+  <p>Guests are requested to:</p>
+  <ul>
+    <li>Keep the beach and property clean.</li>
+    <li>Use waste bins provided.</li>
+    <li>Avoid plastic or other waste entering the sea.</li>
+    <li>Respect local residents, fishermen and other beach users.</li>
+    <li>Avoid unnecessary disturbance to marine life.</li>
+    <li>Conserve water and electricity.</li>
+    <li>Report leaks, electrical problems or other safety concerns immediately.</li>
+  </ul>
+</section>
+
+<!-- 7. LIABILITY -->
+<section class="card">
+  <h2>7. Liability &amp; Acknowledgement</h2>
+  <p>I/We confirm that I/we have read and understood the above house rules and sea-safety guidelines.</p>
+  <p>I/We understand that the property is located directly beside the sea and that the sea, beach, weather and surrounding natural environment involve inherent risks.</p>
+  <p>I/We agree to exercise reasonable care and accept responsibility for our own safety and the safety of children/minors under our supervision.</p>
+  <p>I/We understand that parents/guardians remain responsible for children and that the property staff cannot provide continuous supervision of guests or children.</p>
+  <p>I/We agree to follow instructions given by the property management/caretaker concerning safety, weather conditions and access to the beach or sea.</p>
+  <p>I/We further agree to compensate the property for any damage caused by me/us through negligence, misuse or violation of the house rules.</p>
+  <label class="check"><input type="checkbox" name="ackLiability" required> I/We accept the Liability &amp; Acknowledgement above.</label>
+</section>
+
+<!-- DECLARATION -->
+<section class="card">
+  <h2>Guest Declaration</h2>
+  <div class="grid">
+    <div class="full"><label>Type your full name as signature <span class="req">*</span></label><input name="declarationName" required maxlength="120"></div>
+  </div>
+  <label class="check"><input type="checkbox" name="groupBooking" id="groupBooking"> This is a group booking.</label>
+  <div id="groupBlock" class="hidden">
+    <p>I confirm that I have communicated the relevant house rules and sea-safety instructions to all members of my group.</p>
+    <label>Lead Guest Name <span class="req">*</span></label><input name="leadGuestName" maxlength="120">
+  </div>
+  <label class="check"><input type="checkbox" name="ackData" required> I consent to Swarga by the Bay storing the details and ID proof above for guest registration and safety purposes during and after my stay.</label>
+  <label class="check"><input type="checkbox" name="declarationAgreed" required> I agree that typing my name above is my signature on this declaration. Date and time are recorded on submission.</label>
+
+  <div id="msg" class="msg" role="alert"></div>
+  <p><button type="submit" id="submitBtn">Submit Check-In</button></p>
+</section>
+
+<section class="card reminder">
+  <p>THE SEA IS BEAUTIFUL BUT UNPREDICTABLE.<br>PLEASE ENJOY IT RESPONSIBLY AND NEVER COMPROMISE ON SAFETY.</p>
+  <p style="font-weight:400">Management – Swarga by the Bay</p>
+</section>
+
+</form>
+
+<section id="done" class="card hidden" style="text-align:center">
+  <h2>Check-in received</h2>
+  <p>Reference: <strong id="refId"></strong></p>
+  <p>Please show this reference to the caretaker. Enjoy your stay.</p>
+</section>
+</main>
+
+<footer>&copy; Swarga by the Bay</footer>
+
+<script src="assets/config.js"></script>
+<script src="assets/checkin.js"></script>
+</body>
+</html>
