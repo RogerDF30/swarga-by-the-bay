@@ -245,22 +245,136 @@
   }
 
   /* ---------- other guests ---------- */
+  let othersList = [];
   async function renderOthers() {
     const sid = col(current, 'Submission ID');
     const summary = col(current, 'Other Guests');
-    const need = Math.max(0, (+col(current, 'Adults') || 0) - 1) + (+col(current, 'Children') || 0);
-    $('#othersSec').classList.toggle('hidden', !summary && !need);
-    if (!summary) { $('#othersBlock').innerHTML = need ? '<p class="fine">Not recorded (this check-in was made before every guest\'s details were required).</p>' : ''; return; }
+    const needA = Math.max(0, (+col(current, 'Adults') || 0) - 1), needC = +col(current, 'Children') || 0;
+    $('#othersSec').classList.remove('hidden');
+    othersList = [];
+    const draw = () => {
+      const gotA = othersList.filter(g => g.kind === 'Adult').length, gotC = othersList.filter(g => g.kind === 'Child').length;
+      const gap = [];
+      if (gotA < needA) gap.push((needA - gotA) + ' adult' + (needA - gotA === 1 ? '' : 's'));
+      if (gotC < needC) gap.push((needC - gotC) + ' child' + (needC - gotC === 1 ? '' : 'ren'));
+      $('#othersBlock').innerHTML = (othersList.length ? othersList.map(g =>
+        '<div class="oguest"><div><b>' + esc(g.no) + '. ' + esc(g.name) + '</b><small>' + (g.kind === 'Child' ? 'Child · age ' + esc(g.age) : 'Adult') +
+        (g.idType ? ' · ' + esc(g.idType) + (g.idNumber ? ' ' + esc(g.idNumber) : '') : '') + '</small></div>' +
+        '<div class="og-acts">' + (g.hasPhoto ? '<button type="button" class="chip-btn dark" data-gphoto="' + esc(g.id) + '">View ID proof</button>' : '<span class="fine">No ID file</span>') +
+        '<button type="button" class="link-btn" data-gedit="' + esc(g.id) + '">Edit</button><button type="button" class="link-btn danger-link" data-gremove="' + esc(g.id) + '">Remove</button></div></div>').join('')
+        : '<p class="fine">No other guests recorded.</p>') +
+        (gap.length ? '<p class="form-warn">Missing details for ' + gap.join(' and ') + ' (declared ' + (needA + 1) + ' adults, ' + needC + ' children).</p>' : '') +
+        '<button type="button" class="chip-btn dark" id="gAdd">+ Add guest</button>';
+    };
+    if (!summary) { draw(); return; }
     $('#othersBlock').innerHTML = '<div class="skeleton"></div>';
     try {
       const list = (await call('guests', { id: sid })).guests;
       if (col(current, 'Submission ID') !== sid) return;
-      $('#othersBlock').innerHTML = list.map(g =>
-        '<div class="oguest"><div><b>' + esc(g.no) + '. ' + esc(g.name) + '</b><small>' + (g.kind === 'Child' ? 'Child · age ' + esc(g.age) : 'Adult') +
-        (g.idType ? ' · ' + esc(g.idType) + (g.idNumber ? ' ' + esc(g.idNumber) : '') : '') + '</small></div>' +
-        (g.hasPhoto ? '<button type="button" class="chip-btn dark" data-gphoto="' + esc(g.id) + '">View ID proof</button>' : '<span class="fine">No ID file</span>') + '</div>').join('');
+      othersList = list; draw();
     } catch (err) { $('#othersBlock').innerHTML = '<p class="fine">' + esc(summary) + '</p>'; }
   }
+
+  /* ---------- staff corrections to a check-in ---------- */
+  const ID_TYPES = ['Aadhaar', 'Passport', 'Driving Licence', 'Voter ID', 'PAN', 'Other'];
+  let editSid = '', editGuest = null;
+  const fld = (id, label, val, type, extra) => '<div class="field"><input id="' + id + '" type="' + (type || 'text') + '" placeholder=" " value="' + esc(val || '') + '"' + (extra || '') + '><label for="' + id + '">' + label + '</label></div>';
+  const lbl = (label, inner) => '<label class="lbl">' + label + inner + '</label>';
+  const fileBox = (id, label) => '<label class="dropzone mini" id="' + id + 'Box"><input type="file" id="' + id + '" accept="image/jpeg,image/png,application/pdf"><span class="dz-text">📷 ' + label + '</span></label>';
+  function readIdFile(file) {
+    if (!file) return Promise.resolve(null);
+    if (file.type === 'application/pdf') {
+      if (file.size > 5 * 1024 * 1024) return Promise.reject(new Error('That PDF is larger than 5 MB.'));
+      return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res({ mime: 'application/pdf', data: r.result.split(',')[1] }); r.onerror = () => rej(new Error('Could not read file.')); r.readAsDataURL(file); });
+    }
+    if (!/^image\/(jpeg|png)$/.test(file.type)) return Promise.reject(new Error('Use a JPG, PNG or PDF file.'));
+    return shrinkImage(file, 1600);
+  }
+  function checkinForm() {
+    editSid = col(current, 'Submission ID');
+    const c = (k) => col(current, k);
+    const body =
+      '<p class="fine">Correct the guest\'s details. The declarations and signature stay as the guest submitted them. Every change is recorded in the activity log with your name.</p>' +
+      '<div class="form-grid">' +
+      '<div class="field full"><input id="ceName" maxlength="120" placeholder=" " value="' + esc(c('Guest Name')) + '"><label for="ceName">Primary guest name</label></div>' +
+      fld('ceMobile', 'Mobile', c('Mobile'), 'tel') + fld('ceEmail', 'Email', c('Email'), 'email') +
+      lbl('Check-in date', '<input id="ceIn" type="date" class="sel" value="' + esc(isoDate(c('Check-in Date'))) + '">') +
+      lbl('Check-in time', '<input id="ceInT" type="time" class="sel" value="' + esc(c('Check-in Time')) + '">') +
+      lbl('Check-out date', '<input id="ceOut" type="date" class="sel" value="' + esc(isoDate(c('Check-out Date'))) + '">') +
+      lbl('Check-out time', '<input id="ceOutT" type="time" class="sel" value="' + esc(c('Check-out Time')) + '">') +
+      lbl('Adults', '<input id="ceAdults" type="number" min="1" max="50" class="sel" value="' + esc(c('Adults') || 1) + '">') +
+      lbl('Children', '<input id="ceKids" type="number" min="0" max="50" class="sel" value="' + esc(c('Children') || 0) + '">') +
+      fld('ceEName', 'Emergency contact name', c('Emergency Contact Name')) + fld('ceEPhone', 'Emergency contact number', c('Emergency Contact No.'), 'tel') +
+      lbl('ID type', '<select id="ceIdType" class="sel">' + opts(ID_TYPES, c('ID Type') || 'Aadhaar') + '</select>') +
+      '</div>' +
+      fileBox('ceIdFile', c('ID Photo File ID') ? 'Replace ID photo (optional)' : 'Add ID photo (missing)') +
+      '<div class="act-row end"><button type="button" class="chip-btn dark" id="ceCancel">Cancel</button><button type="button" class="btn btn-sun" id="ceSave">Save changes</button></div>';
+    openPanel('checkinForm', editSid, 'Edit ' + c('Guest Name'), '', body);
+    $('#pBody').scrollTop = 0;
+  }
+  function guestForm(g) {
+    editGuest = g || null;
+    const isNew = !g; g = g || { kind: 'Adult', name: '', age: '', idType: '' };
+    const body =
+      '<div class="form-grid">' +
+      lbl('Type', '<select id="geKind" class="sel">' + opts(['Adult', 'Child'], g.kind) + '</select>') +
+      '<div class="field"><input id="geName" maxlength="120" placeholder=" " value="' + esc(g.name) + '"><label for="geName">Full name</label></div>' +
+      lbl('Age (children)', '<input id="geAge" type="number" min="0" max="17" class="sel" value="' + esc(g.age) + '">') +
+      lbl('ID type', '<select id="geIdType" class="sel"><option value="">—</option>' + opts(ID_TYPES, g.idType) + '</select>') +
+      '</div>' +
+      fileBox('geFile', isNew ? 'Add ID photo (required for adults)' : (g.hasPhoto ? 'Replace ID photo (optional)' : 'Add ID photo')) +
+      '<div class="act-row end"><button type="button" class="chip-btn dark" id="geCancel">Cancel</button><button type="button" class="btn btn-sun" id="geSave">' + (isNew ? 'Add guest' : 'Save guest') + '</button></div>';
+    openPanel('guestForm', col(current, 'Submission ID'), isNew ? 'Add a guest' : 'Edit ' + g.name, '', body);
+    $('#pBody').scrollTop = 0;
+    syncGuestKind();
+  }
+  function syncGuestKind() {
+    const child = $('#geKind').value === 'Child';
+    $('#geAge').closest('.lbl').classList.toggle('hidden', !child);
+  }
+  async function afterCheckinEdit(msg) {
+    $('#panel').close();
+    toast(msg);
+    await quietReload();
+    if (current) openDetail();
+  }
+  $('#pBody').addEventListener('change', e => {
+    if (e.target.id === 'geKind') syncGuestKind();
+    if (e.target.id === 'ceIdFile' || e.target.id === 'geFile') {
+      const f = e.target.files[0], box = e.target.closest('.dropzone');
+      if (f) { box.classList.add('has-file'); box.querySelector('.dz-text').textContent = '✓ ' + f.name; }
+    }
+  });
+  $('#pBody').addEventListener('click', async e => {
+    const t = e.target;
+    if (panelMode === 'checkinForm') {
+      if (t.id === 'ceCancel') return $('#panel').close();
+      if (t.id === 'ceSave') {
+        const data = {
+          guestName: $('#ceName').value, mobile: $('#ceMobile').value, email: $('#ceEmail').value,
+          checkInDate: $('#ceIn').value, checkInTime: $('#ceInT').value, checkOutDate: $('#ceOut').value, checkOutTime: $('#ceOutT').value,
+          adults: $('#ceAdults').value, children: $('#ceKids').value,
+          emergencyName: $('#ceEName').value, emergencyPhone: $('#ceEPhone').value, idType: $('#ceIdType').value
+        };
+        return busy(t, async () => {
+          data.idPhoto = await readIdFile($('#ceIdFile').files[0]);
+          const r = await call('updateCheckin', { id: editSid, data });
+          await afterCheckinEdit(r.changed ? 'Saved ' + r.changed + ' change' + (r.changed === 1 ? '' : 's') + '.' : 'No changes.');
+        });
+      }
+    }
+    if (panelMode === 'guestForm') {
+      if (t.id === 'geCancel') return $('#panel').close();
+      if (t.id === 'geSave') {
+        const data = { id: editGuest ? editGuest.id : '', kind: $('#geKind').value, name: $('#geName').value, age: $('#geAge').value, idType: $('#geIdType').value };
+        return busy(t, async () => {
+          data.idPhoto = await readIdFile($('#geFile').files[0]);
+          await call('saveGuest', { id: col(current, 'Submission ID'), data });
+          await afterCheckinEdit(editGuest ? 'Guest updated.' : 'Guest added.');
+        });
+      }
+    }
+  });
 
   /* ---------- stay actions ---------- */
   let staffName = me ? me.name : '';
@@ -366,6 +480,18 @@
       return;
     }
     if (e.target.id === 'pdfBtn') return downloadCheckinPdf(col(current, 'Submission ID'), e.target);
+    if (e.target.id === 'editCheckin') return checkinForm();
+    if (e.target.id === 'gAdd') return guestForm(null);
+    const ge = e.target.closest('[data-gedit]');
+    if (ge) return guestForm(othersList.find(g => g.id === ge.dataset.gedit));
+    const gr = e.target.closest('[data-gremove]');
+    if (gr) {
+      if (!gr.dataset.armed) { gr.dataset.armed = '1'; gr.textContent = 'Confirm remove'; setTimeout(() => { if (gr.isConnected) { delete gr.dataset.armed; gr.textContent = 'Remove'; } }, 4000); return; }
+      gr.disabled = true;
+      try { await call('removeGuest', { id: gr.dataset.gremove }); toast('Guest removed.'); await quietReload(); if (current) openDetail(); }
+      catch (err) { toast(err.message); gr.disabled = false; }
+      return;
+    }
     if (e.target.id === 'delCheckin') {
       const sid = col(current, 'Submission ID');
       return confirmDelete('checkin', sid, 'Delete check-in ' + sid + '?', col(current, 'Guest Name') + ' · ' + niceDate(col(current, 'Check-in Date')) + ' → ' + niceDate(col(current, 'Check-out Date')) + '. The check-in, the other guests and all ID files are removed (ID files go to Drive trash for 30 days).', () => { $('#detail').close(); current = null; });

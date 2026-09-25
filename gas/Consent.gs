@@ -216,6 +216,7 @@ function checkinPdf_(submissionId, sess) {
     row('Vehicles', (Number(c.Vehicles) || 0) ? v('Vehicles') + (c['Vehicle Numbers'] ? ' · ' + v('Vehicle Numbers') : '') : 'None') +
     row('Emergency contact', v('Emergency Contact Name') + ' · ' + v('Emergency Contact No.')) +
     row('ID verified by staff', c.Status === 'Verified' ? v('Rep Name') + ' · ' + v('Rep Verified At') : 'Not yet verified') +
+    (c['Edited By'] ? row('Corrected by staff', v('Edited By') + ' · ' + v('Edited At') + ' <span class="muted">(details corrected after submission; declarations and signature unchanged)</span>') : '') +
     row('Stay status', v('Stay Status') + (c['Actual Check-in'] ? ' · in ' + v('Actual Check-in') : '') + (c['Actual Check-out'] ? ' · out ' + v('Actual Check-out') : '')) +
     '</table>' +
     '<h3>All guests</h3><table class="g"><tr><th>#</th><th>Name</th><th>Type</th><th>ID</th></tr>' + guestRows + '</table>' +

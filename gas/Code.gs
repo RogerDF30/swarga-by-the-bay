@@ -24,7 +24,7 @@ const HEADERS = [
   'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
   'Vehicle Numbers',   // columns below were appended later; keep new columns at the end
   'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By',
-  'Booking ID', 'Other Guests', 'Consent Version'
+  'Booking ID', 'Other Guests', 'Consent Version', 'Edited By', 'Edited At'
 ];
 const GUESTS = 'Guests';
 const GUEST_HEADERS = ['Guest ID', 'Submission ID', 'No.', 'Kind', 'Name', 'Age', 'ID Type', 'ID Number', 'ID Photo File ID', 'Added At'];
@@ -121,6 +121,9 @@ function doPost(e) {
       guests:         (b, s) => ({ ok: true, guests: guestsOf_(b.id) }),
       guestPhoto:     (b, s) => guestPhoto_(b.id),
       checkinPdf:     (b, s) => checkinPdf_(b.id, s),
+      updateCheckin:  (b, s) => updateCheckin_(b.id, b.data, s),
+      saveGuest:      (b, s) => saveGuest_(b.id, b.data, s),
+      removeGuest:    (b, s) => removeGuest_(b.id, s),
       verify:         (b, s) => verify_(b.id, s),
       vehicles:       (b, s) => updateVehicles_(b.id, b.count, b.numbers, s),
       stay:           (b, s) => stay_(b.id, b.move, s),

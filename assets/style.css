@@ -661,3 +661,6 @@ body.adm:not(.is-super) .super-only { display: none; }
 .confirm-dlg h3 { margin: 0 0 6px; font-family: var(--serif); color: #b3261e; overflow-wrap: anywhere; }
 .pdf-row { align-items: center; margin: 12px 0 4px; } .pdf-row .fine { margin: 0; }
 .pdf-open { display: inline-flex; text-decoration: none; padding: 10px 18px; }
+.og-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.danger-link { color: #b3261e !important; }
+#othersBlock #gAdd { margin-top: 10px; }
