@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=12">
+<link rel="stylesheet" href="assets/style.css?v=13">
 </head>
 <body class="adm">
 
@@ -195,12 +195,25 @@
       <h3>✍️ Property representative</h3>
       <div id="verifyBlock"></div>
     </section>
+    <section class="dsec super-only">
+      <h3>🗑 Delete</h3>
+      <p class="fine">Removes this check-in, the other guests' details and all ID files (moved to Drive trash). A linked booking stays.</p>
+      <button type="button" class="chip-btn danger" id="delCheckin">Delete check-in</button>
+    </section>
   </div>
+</dialog>
+
+<!-- ============ DELETE CONFIRM ============ -->
+<dialog id="confirmDlg" class="confirm-dlg">
+  <h3 id="cfTitle">Delete?</h3>
+  <p id="cfText" class="fine"></p>
+  <div class="field"><input id="cfInput" autocomplete="off" placeholder=" "><label for="cfInput">Type DELETE to confirm</label></div>
+  <div class="act-row end"><button type="button" class="chip-btn dark" id="cfCancel">Cancel</button><button type="button" class="btn btn-danger" id="cfGo" disabled>Delete permanently</button></div>
 </dialog>
 
 <div id="msg" class="toast" role="alert"></div>
 
-<script src="assets/config.js?v=12"></script>
-<script src="assets/admin.js?v=12"></script>
+<script src="assets/config.js?v=13"></script>
+<script src="assets/admin.js?v=13"></script>
 </body>
 </html>

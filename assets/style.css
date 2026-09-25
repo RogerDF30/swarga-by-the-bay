@@ -646,3 +646,16 @@ button.oc-c { cursor: pointer; }
 .oguest:last-child { border-bottom: 0; }
 .oguest small { display: block; color: var(--muted); }
 .oguest .idimg { width: 100%; }
+
+/* ============ delete ============ */
+body.adm:not(.is-super) .super-only { display: none; }
+.pay-row { position: relative; }
+.pay-del { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; border: 1px solid #f3c7c2; background: #fff; color: #b3261e; cursor: pointer; font-size: .8rem; }
+.pay-del:hover { background: #fdecea; }
+.pay-row:has(.pay-del) { padding-right: 38px; }
+.push-left { margin-right: auto; }
+.btn-danger { background: #b3261e; color: #fff; }
+.btn-danger:disabled { background: #e3b4b0; cursor: not-allowed; }
+.confirm-dlg { width: min(440px, calc(100vw - 32px)); border: 0; border-radius: var(--radius); padding: 22px 22px 16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); color: var(--ink); }
+.confirm-dlg::backdrop { background: rgba(8,24,32,.55); }
+.confirm-dlg h3 { margin: 0 0 6px; font-family: var(--serif); color: #b3261e; overflow-wrap: anywhere; }

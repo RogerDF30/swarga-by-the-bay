@@ -368,6 +368,10 @@
       } catch (err) { toast(err.message); gp.disabled = false; gp.textContent = 'View ID proof'; }
       return;
     }
+    if (e.target.id === 'delCheckin') {
+      const sid = col(current, 'Submission ID');
+      return confirmDelete('checkin', sid, 'Delete check-in ' + sid + '?', col(current, 'Guest Name') + ' · ' + niceDate(col(current, 'Check-in Date')) + ' → ' + niceDate(col(current, 'Check-out Date')) + '. The check-in, the other guests and all ID files are removed (ID files go to Drive trash for 30 days).', () => { $('#detail').close(); current = null; });
+    }
     if (e.target.id === 'loadPhoto') {
       e.target.disabled = true;
       e.target.textContent = 'Loading…';
@@ -619,7 +623,8 @@
 
       '<section class="dsec"><h3>💳 Payments</h3>' +
       '<div class="pay-sum"><div><small>Total</small><strong>' + inr(b.Total) + '</strong></div><div><small>Paid</small><strong>' + inr(b.Paid) + '</strong></div><div class="' + (bal > 0.5 ? 'owe' : 'clear') + '"><small>Balance</small><strong>' + inr(Math.max(bal, 0)) + '</strong></div></div>' +
-      (pays.length ? '<div class="pay-list">' + pays.map(p => '<div class="pay-row"><span><b>' + inr(Math.abs(num(p.Amount))) + '</b> ' + esc(p.Kind) + ' · ' + esc(p.Mode) + (p.Reference ? ' · ' + esc(p.Reference) : '') + '</span><small>' + esc(p['Recorded At']) + ' · ' + esc(p['Recorded By']) + '</small></div>').join('') + '</div>' : '<p class="fine">No payments recorded yet.</p>') +
+      (pays.length ? '<div class="pay-list">' + pays.map(p => '<div class="pay-row"><span><b>' + inr(Math.abs(num(p.Amount))) + '</b> ' + esc(p.Kind) + ' · ' + esc(p.Mode) + (p.Reference ? ' · ' + esc(p.Reference) : '') + '</span><small>' + esc(p['Recorded At']) + ' · ' + esc(p['Recorded By']) + '</small>' +
+        (isSuper() ? '<button type="button" class="pay-del" data-delpay="' + esc(p['Payment ID']) + '" title="Delete this payment" aria-label="Delete payment">✕</button>' : '') + '</div>').join('') + '</div>' : '<p class="fine">No payments recorded yet.</p>') +
       '<div class="pay-form"><div class="field"><input id="payAmt" inputmode="decimal" placeholder=" " value="' + (bal > 0.5 ? Math.round(bal) : '') + '"><label for="payAmt">Amount (₹)</label></div>' +
       '<select id="payMode" class="sel">' + opts(db.options.modes, 'UPI') + '</select>' +
       '<div class="field"><input id="payRef" maxlength="80" placeholder=" "><label for="payRef">Reference / UTR (optional)</label></div></div>' +
@@ -652,7 +657,8 @@
       (b['Special Requests'] ? '<dt>Requests</dt><dd>' + esc(b['Special Requests']) + '</dd>' : '') +
       (b['Internal Notes'] ? '<dt>Notes</dt><dd>' + esc(b['Internal Notes']) + '</dd>' : '') +
       '<dt>Created</dt><dd>' + esc(b['Created At']) + '</dd>' +
-      '<dt>Updated</dt><dd>' + esc(b['Updated At']) + (b['Updated By'] ? ' · ' + esc(b['Updated By']) : '') + '</dd></dl></section>';
+      '<dt>Updated</dt><dd>' + esc(b['Updated At']) + (b['Updated By'] ? ' · ' + esc(b['Updated By']) : '') + '</dd></dl></section>' +
+      (isSuper() ? '<section class="dsec"><h3>🗑 Delete</h3><p class="fine">Removes this booking and its ' + pays.length + ' payment record(s). A linked check-in stays in the guest log.</p><button type="button" class="chip-btn danger" id="delBooking">Delete booking</button></section>' : '');
 
     const scroll = keepScroll ? $('#pBody').scrollTop : 0;
     openPanel('booking', id, b['Guest Name'],
@@ -702,6 +708,11 @@
         return;
       }
       if (t.id === 'editBooking') return bookingForm(b);
+      if (t.id === 'delBooking') return confirmDelete('booking', openBookingId, 'Delete booking ' + openBookingId + '?',
+        b['Guest Name'] + ' · ' + niceDate(b['Check-in Date']) + ' → ' + niceDate(b['Check-out Date']) + '. The booking and its payments are removed. A copy is kept in the Deleted log.',
+        () => { $('#panel').close(); });
+      const dp = t.closest('[data-delpay]');
+      if (dp) { const p = db.payments.find(x => x['Payment ID'] === dp.dataset.delpay) || {}; return confirmDelete('payment', dp.dataset.delpay, 'Delete this payment?', inr(Math.abs(num(p.Amount))) + ' ' + (p.Kind || '') + ' · ' + (p.Mode || '') + ' · ' + (p['Recorded At'] || '') + '. The paid total is recalculated.'); }
       const lg = t.closest('[data-open-log]');
       if (lg) {
         const r = rows.find(x => col(x, 'Submission ID') === lg.dataset.openLog);
@@ -717,6 +728,7 @@
     if (panelMode === 'roomForm') {
       if (t.id === 'rfCancel') return $('#panel').close();
       if (t.id === 'rfSave') return saveRoomForm(t);
+      if (t.id === 'rfDelete') { const r = db.rooms.find(x => x['Room ID'] === editRoomId) || {}; return confirmDelete('room', editRoomId, 'Delete room ' + (r.Name || '') + '?', 'The room and its photos are removed. Past bookings keep their records. To hide a room without deleting it, set its status to Inactive.', () => $('#panel').close()); }
     }
   });
   $('#pBody').addEventListener('input', e => { if (panelMode === 'bookingForm' && /^bf/.test(e.target.id)) bfRecalc(e.target.id); });
@@ -885,7 +897,7 @@
       '<h3 class="mini">Photos <small>up to 6 · the first is the cover</small></h3>' +
       (editRoomId ? '<div id="rfPhotos" class="ph-grid"></div><label class="chip-btn dark ph-add"><input type="file" id="rfPhotoIn" accept="image/jpeg,image/png,image/webp" multiple hidden>+ Add photos</label>'
         : '<p class="fine">Save the room first, then add photos.</p>') +
-      '<div class="act-row end"><button type="button" class="chip-btn dark" id="rfCancel">Cancel</button><button type="button" class="btn btn-sun" id="rfSave">' + (editRoomId ? 'Save room' : 'Add room') + '</button></div>';
+      '<div class="act-row end">' + (editRoomId && isSuper() ? '<button type="button" class="chip-btn danger push-left" id="rfDelete">Delete room</button>' : '') + '<button type="button" class="chip-btn dark" id="rfCancel">Cancel</button><button type="button" class="btn btn-sun" id="rfSave">' + (editRoomId ? 'Save room' : 'Add room') + '</button></div>';
     roomPhotos = photoRefs(r.Photos);
     openPanel('roomForm', editRoomId || 'New room', editRoomId ? r.Name : 'Add a room', editRoomId ? '<span class="badge rs-' + slug(r.Status) + '">' + esc(r.Status) + '</span>' : '', body);
     $('#pBody').scrollTop = 0;
@@ -1056,7 +1068,7 @@
       field('ufPass', isNew ? 'Password (10+ characters)' : 'New password (leave blank to keep)', '', 'text', ' autocomplete="off"') +
       '<button type="button" class="link-btn" id="ufGen">Generate a strong password</button>' +
       '<p class="fine">Share the password privately. The user can change it under My account.</p>' +
-      '<div class="act-row end"><button type="button" class="chip-btn dark" id="ufCancel">Cancel</button><button type="button" class="btn btn-sun" id="ufSave">' + (isNew ? 'Create user' : 'Save user') + '</button></div>';
+      '<div class="act-row end">' + (!isNew && u.username !== me.username ? '<button type="button" class="chip-btn danger push-left" id="ufDelete">Delete user</button>' : '') + '<button type="button" class="chip-btn dark" id="ufCancel">Cancel</button><button type="button" class="btn btn-sun" id="ufSave">' + (isNew ? 'Create user' : 'Save user') + '</button></div>';
     openPanel('userForm', isNew ? 'New user' : u.username, isNew ? 'Add a user' : u.name, isNew ? '' : '<span class="badge role-' + slug(u.role) + '">' + esc(u.role) + '</span>', body);
     $('#pBody').dataset.uname = isNew ? '' : u.username;
   }
@@ -1142,12 +1154,16 @@
   /* ---- activity ---- */
   let actTab = 'audit';
   async function renderActivity() {
-    const tabs = '<div class="tabs" id="actTabs"><button type="button" data-a="audit"' + (actTab === 'audit' ? ' class="on"' : '') + '>Changes</button><button type="button" data-a="email"' + (actTab === 'email' ? ' class="on"' : '') + '>Emails</button></div>';
+    const tabs = '<div class="tabs" id="actTabs"><button type="button" data-a="audit"' + (actTab === 'audit' ? ' class="on"' : '') + '>Changes</button><button type="button" data-a="email"' + (actTab === 'email' ? ' class="on"' : '') + '>Emails</button>' + (isSuper() ? '<button type="button" data-a="deleted"' + (actTab === 'deleted' ? ' class="on"' : '') + '>Deleted</button>' : '') + '</div>';
     $('#sBody').innerHTML = tabs + '<div class="skeleton"></div>';
     if (actTab === 'audit') {
       const r = await call('audit');
       $('#sBody').innerHTML = tabs + (isSuper() ? '' : '<p class="fine">Showing your own actions.</p>') +
         '<div class="log-table">' + (r.rows.length ? r.rows.map(x => '<div class="lrow"><span class="lt">' + esc(x.At) + '</span><span><b>' + esc(x.User) + '</b> ' + esc(x.Action) + ' <em>' + esc(x.Record) + '</em><small>' + esc(x.Summary) + '</small></span></div>').join('') : '<p class="fine">Nothing yet.</p>') + '</div>';
+    } else if (actTab === 'deleted') {
+      const r = await call('deletedList');
+      $('#sBody').innerHTML = tabs + '<p class="fine">A full copy of every deleted record is kept in the "Deleted" tab of the Google Sheet.</p><div class="log-table">' + (r.rows.length ? r.rows.map(x =>
+        '<div class="lrow"><span class="lt">' + esc(x['Deleted At']) + '</span><span><b>' + esc(x.By) + '</b> deleted ' + esc(x.Kind) + ' <em>' + esc(x['Record ID']) + '</em><small>' + esc(x.Summary) + '</small></span></div>').join('') : '<p class="fine">Nothing deleted.</p>') + '</div>';
     } else {
       const r = await call('emailLog');
       $('#sBody').innerHTML = tabs + '<div class="log-table">' + (r.rows.length ? r.rows.map(x =>
@@ -1221,6 +1237,7 @@
     if (panelMode === 'userForm') {
       if (t.id === 'ufCancel') return $('#panel').close();
       if (t.id === 'ufGen') { $('#ufPass').value = genPass(); return; }
+      if (t.id === 'ufDelete') { const un = $('#pBody').dataset.uname; return confirmDelete('user', un, 'Delete user ' + un + '?', 'They are signed out and can no longer sign in. Their past actions stay in the activity log. To pause access instead, set Status to Disabled.', async () => { $('#panel').close(); await openSettings('users'); }); }
       if (t.id === 'ufSave') {
         const existing = $('#pBody').dataset.uname;
         const data = { isNew: !existing, username: existing || $('#ufUser').value.trim().toLowerCase(), name: $('#ufName').value.trim(), email: $('#ufEmail').value.trim(), role: $('#ufRole').value, status: $('#ufStatus').value, password: $('#ufPass').value };
@@ -1241,6 +1258,32 @@
       if (t.id === 'tpSave') return save({ subject: $('#tpSubject').value, body: $('#tpBody').value });
       if (t.id === 'tpReset') return save({ reset: true });
     }
+  });
+
+  /* ---------- delete (Super admin) ---------- */
+  let cfJob = null;
+  function confirmDelete(kind, id, title, text, after) {
+    cfJob = { kind, id, after };
+    $('#cfTitle').textContent = title;
+    $('#cfText').textContent = text;
+    $('#cfInput').value = ''; $('#cfGo').disabled = true;
+    $('#confirmDlg').showModal();
+    $('#cfInput').focus();
+  }
+  $('#cfInput').addEventListener('input', () => { $('#cfGo').disabled = $('#cfInput').value.trim().toUpperCase() !== 'DELETE'; });
+  $('#cfCancel').addEventListener('click', () => $('#confirmDlg').close());
+  $('#cfGo').addEventListener('click', async () => {
+    const job = cfJob, btn = $('#cfGo');
+    if (!job) return;
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await call('deleteRecord', { kind: job.kind, id: job.id });
+      $('#confirmDlg').close();
+      toast('Deleted.');
+      if (job.after) await job.after();
+      await quietReload();
+    } catch (err) { toast(err.message); btn.disabled = false; }
+    finally { btn.textContent = 'Delete permanently'; }
   });
 
   /* ---------- init ---------- */

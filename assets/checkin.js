@@ -105,7 +105,7 @@
     const list = $('#plateList');
     const keep = $$('input', list).map(i => i.value);
     list.innerHTML = Array.from({ length: n }, (_, i) =>
-      '<div class="field"><input id="plate' + i + '" class="plate" maxlength="15" autocomplete="off" autocapitalize="characters" placeholder=" " value="' + esc(keep[i] || '') + '">' +
+      '<div class="field"><input id="plate' + i + '" class="plate" required minlength="4" maxlength="15" autocomplete="off" autocapitalize="characters" placeholder=" " value="' + esc(keep[i] || '') + '">' +
       '<label for="plate' + i + '">Vehicle ' + (i + 1) + ' number (e.g. KA 20 AB 1234)</label></div>').join('');
     $('#plateBlock').classList.toggle('hidden', n === 0);
   }

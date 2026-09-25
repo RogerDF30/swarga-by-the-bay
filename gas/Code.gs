@@ -101,7 +101,9 @@ function doPost(e) {
       testEmail:       (b, s) => testEmail_(b.to, s),
       previewEmail:    (b, s) => previewEmail_(b.key, b.draft),
       installTriggers: (b, s) => installTriggers_(s),
-      resendEmail:     (b, s) => resendEmail_(b.id, s)
+      resendEmail:     (b, s) => resendEmail_(b.id, s),
+      deleteRecord:    (b, s) => deleteRecord_(b.kind, b.id, s),
+      deletedList:     (b, s) => deletedList_()
     };
     if (SUPER[a]) return json_(SUPER[a](body, requireSuper_(body.token)));
 
@@ -145,6 +147,9 @@ function submit_(d) {
   req.forEach(k => { if (!String(d[k] || '').trim()) throw new Error('Missing field: ' + k); });
   if (!String(d.email || '').trim()) throw new Error('Email is required.');
   if (!d.idPhoto || !d.idPhoto.data) throw new Error('Please add a photo of your ID proof.');
+  const vehCount = num_(d.vehicles);
+  const vehNums = (Array.isArray(d.vehicleNumbers) ? d.vehicleNumbers : String(d.vehicleNumbers || '').split(',')).map(v => String(v).trim()).filter(Boolean);
+  if (vehCount > 0 && vehNums.length < vehCount) throw new Error('Please enter the number of every vehicle (' + vehCount + ').');
   const others = checkOtherGuests_(d);
   ['ackHouse', 'ackSea', 'ackWeather', 'ackLiability', 'ackData', 'declarationAgreed']
     .forEach(k => { if (d[k] !== true) throw new Error('All acknowledgements are required.'); });
