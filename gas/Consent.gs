@@ -176,7 +176,7 @@ function checkinPdf_(submissionId, sess) {
     if (!f) { idImgs.push({ label: label, html: '<p class="muted">No ID file on record.</p>' }); return; }
     if (f.mime === 'application/pdf') {
       attachments.push({ label: label, name: f.name, mime: f.mime, data: f.data });
-      idImgs.push({ label: label, html: '<p class="muted">ID proof was supplied as a PDF file (' + pdfEsc_(f.name) + '). It is downloaded alongside this document.</p>' });
+      idImgs.push({ label: label, html: '<p class="muted">ID proof was supplied as a PDF file (' + pdfEsc_(f.name) + '). It is included as a separate file in the same download (zip).</p>' });
     } else {
       idImgs.push({ label: label, html: '<img class="idimg" src="data:' + f.mime + ';base64,' + f.data + '">' });
     }
@@ -238,8 +238,16 @@ function checkinPdf_(submissionId, sess) {
     '<div class="foot">Generated ' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'd MMM yyyy, HH:mm') + ' IST by ' + pdfEsc_(sess.name) + '. Confidential: contains identity documents. Store and share only for guest registration and safety purposes.</div>' +
     '</body></html>';
 
-  const pdf = Utilities.newBlob(html, 'text/html', submissionId + '.html').getAs('application/pdf');
-  const name = 'Check-in ' + submissionId + ' ' + String(c['Guest Name'] || '').replace(/[^\w ]+/g, '').trim() + '.pdf';
-  audit_(sess, 'checkin.pdf', submissionId, 'PDF generated' + (attachments.length ? ' + ' + attachments.length + ' PDF ID file(s)' : ''));
-  return { ok: true, name: name, data: Utilities.base64Encode(pdf.getBytes()), attachments: attachments };
+  const base = 'Check-in ' + submissionId + ' ' + String(c['Guest Name'] || '').replace(/[^\w ]+/g, '').trim();
+  const pdf = Utilities.newBlob(html, 'text/html', submissionId + '.html').getAs('application/pdf').setName(base + '.pdf');
+  if (!attachments.length) {
+    audit_(sess, 'checkin.pdf', submissionId, 'PDF generated');
+    return { ok: true, kind: 'pdf', name: base + '.pdf', mime: 'application/pdf', data: Utilities.base64Encode(pdf.getBytes()) };
+  }
+  // Some ID proofs are PDF files: bundle the record and those files into one zip.
+  const files = [pdf].concat(attachments.map((a, i) =>
+    Utilities.newBlob(Utilities.base64Decode(a.data), 'application/pdf', 'ID proof ' + (i + 1) + ' - ' + a.label.replace(/[^\w ]+/g, ' ').replace(/\s+/g, ' ').trim() + '.pdf')));
+  const zip = Utilities.zip(files, base + '.zip');
+  audit_(sess, 'checkin.pdf', submissionId, 'Zip generated: record PDF + ' + attachments.length + ' PDF ID file(s)');
+  return { ok: true, kind: 'zip', name: base + '.zip', mime: 'application/zip', data: Utilities.base64Encode(zip.getBytes()), count: files.length };
 }

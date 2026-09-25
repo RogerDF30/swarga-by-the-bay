@@ -359,12 +359,9 @@
       gp.disabled = true; gp.textContent = 'Loading…';
       try {
         const p = (await call('guestPhoto', { id: gp.dataset.gphoto })).photo;
-        const box = gp.parentElement;
         if (!p) { gp.outerHTML = '<span class="fine">No file.</span>'; return; }
-        const src = 'data:' + p.mime + ';base64,' + p.data;
-        gp.outerHTML = p.mime === 'application/pdf'
-          ? '<a class="chip-btn dark" download="' + esc(gp.dataset.gphoto) + '.pdf" href="' + src + '">⬇ Download ID (PDF)</a>'
-          : '<img class="idimg" alt="ID proof" src="' + src + '">';
+        if (p.mime === 'application/pdf') { const box = gp.parentElement; gp.outerHTML = pdfLink(p.data); const a = box.querySelector('.pdf-open'); if (a) a.click(); return; }
+        gp.outerHTML = '<img class="idimg" alt="ID proof" src="data:' + p.mime + ';base64,' + p.data + '">';
       } catch (err) { toast(err.message); gp.disabled = false; gp.textContent = 'View ID proof'; }
       return;
     }
@@ -380,10 +377,8 @@
         const res = await call('photo', { id: col(current, 'Submission ID') });
         const p = res.photo;
         if (!p) { $('#idProof').innerHTML = '<p class="fine">No file uploaded.</p>'; return; }
-        const src = 'data:' + p.mime + ';base64,' + p.data;
-        $('#idProof').innerHTML = p.mime === 'application/pdf'
-          ? '<a class="chip-btn dark" download="' + esc(col(current, 'Submission ID')) + '.pdf" href="' + src + '">⬇ Download ID proof (PDF)</a>'
-          : '<img class="idimg" alt="ID proof" src="' + src + '">';
+        if (p.mime === 'application/pdf') { $('#idProof').innerHTML = pdfLink(p.data); $('#idProof .pdf-open').click(); return; }
+        $('#idProof').innerHTML = '<img class="idimg" alt="ID proof" src="data:' + p.mime + ';base64,' + p.data + '">';
       } catch (err) {
         toast(err.message);
         e.target.disabled = false;
@@ -1263,6 +1258,16 @@
   });
 
   /* ---------- check-in PDF ---------- */
+  function b64Blob(mime, b64) {
+    const bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+  /** Link that opens a PDF ID proof in a new browser tab. */
+  function pdfLink(b64) {
+    const url = URL.createObjectURL(b64Blob('application/pdf', b64));
+    return '<a class="btn btn-sea pdf-open" target="_blank" rel="noopener" href="' + url + '">📄 Open ID proof (PDF) ↗</a>';
+  }
   function saveB64(name, mime, b64) {
     const bin = atob(b64), bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -1275,9 +1280,8 @@
     const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing PDF…';
     try {
       const r = await call('checkinPdf', { id });
-      saveB64(r.name, 'application/pdf', r.data);
-      (r.attachments || []).forEach((f, i) => setTimeout(() => saveB64(id + ' ID ' + (i + 1) + ' - ' + f.label.replace(/[^\w ]+/g, '').trim() + '.pdf', f.mime, f.data), 600 * (i + 1)));
-      toast('PDF downloaded' + (r.attachments && r.attachments.length ? ' with ' + r.attachments.length + ' separate PDF ID file(s).' : '.'));
+      saveB64(r.name, r.mime || 'application/pdf', r.data);
+      toast(r.kind === 'zip' ? 'Zip downloaded: check-in PDF + ' + (r.count - 1) + ' PDF ID file(s).' : 'PDF downloaded.');
     } catch (err) { toast(err.message); }
     finally { btn.disabled = false; btn.textContent = label; }
   }
