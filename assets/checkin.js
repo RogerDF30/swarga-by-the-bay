@@ -69,12 +69,7 @@
   f.checkOutDate.addEventListener('change', updateNights);
   updateNights();
 
-  $$('.time-chip').forEach(chip => chip.addEventListener('click', () => {
-    const input = f[chip.dataset.time];
-    chip.classList.add('hidden');
-    input.classList.remove('hidden');
-    input.focus();
-  }));
+  // Check-in and check-out times are fixed by the property; guests cannot change them.
 
   /* ---------- steppers ---------- */
   $$('.stepper').forEach(st => {

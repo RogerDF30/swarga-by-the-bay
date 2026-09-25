@@ -10,6 +10,8 @@
 const SHEET_NAME = 'CheckIns';
 const TOKEN_TTL_SEC = 6 * 60 * 60;      // admin session: 6 h
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB after client compression
+const FIXED_CHECKIN_TIME = '13:00';   // guests cannot change these; staff can via Edit details
+const FIXED_CHECKOUT_TIME = '11:00';
 const MAX_LOGIN_FAILS = 5;              // per 15 min
 
 const HEADERS = [
@@ -178,7 +180,7 @@ function submit_(d) {
       id, new Date(),
       clean_(d.guestName), txt_(d.mobile), clean_(d.email),
       num_(d.adults), num_(d.children), num_(d.vehicles),
-      txt_(d.checkInDate), txt_(d.checkInTime), txt_(d.checkOutDate), txt_(d.checkOutTime),
+      txt_(d.checkInDate), txt_(FIXED_CHECKIN_TIME), txt_(d.checkOutDate), txt_(FIXED_CHECKOUT_TIME),
       clean_(d.idType), txt_(d.idNumber), fileId,
       clean_(d.emergencyName), txt_(d.emergencyPhone),
       'Yes', 'Yes', 'Yes', 'Yes', 'Yes',

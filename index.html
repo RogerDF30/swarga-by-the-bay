@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=18">
+<link rel="stylesheet" href="assets/style.css?v=19">
 </head>
 <body class="guest-page">
 
@@ -70,18 +70,18 @@
       <div class="stay-col">
         <label for="checkInDate">Check-in</label>
         <input id="checkInDate" name="checkInDate" type="date" required>
-        <button type="button" class="time-chip" data-time="checkInTime"><span>🕐</span> <b id="checkInTimeLabel">1:00 PM</b></button>
-        <input name="checkInTime" type="time" class="time-edit hidden">
+        <span class="time-chip fixed"><span>🕐</span> <b id="checkInTimeLabel">1:00 PM</b></span>
+        <input name="checkInTime" type="hidden">
       </div>
       <div class="stay-mid"><span id="nights">1 night</span></div>
       <div class="stay-col">
         <label for="checkOutDate">Check-out</label>
         <input id="checkOutDate" name="checkOutDate" type="date" required>
-        <button type="button" class="time-chip" data-time="checkOutTime"><span>🕚</span> <b id="checkOutTimeLabel">11:00 AM</b></button>
-        <input name="checkOutTime" type="time" class="time-edit hidden">
+        <span class="time-chip fixed"><span>🕚</span> <b id="checkOutTimeLabel">11:00 AM</b></span>
+        <input name="checkOutTime" type="hidden">
       </div>
     </div>
-    <p class="fine">Standard times are pre-filled. Tap a time only if the caretaker has approved a change.</p>
+    <p class="fine">Check-in is from 1:00 PM and check-out is by 11:00 AM. For an early arrival or late departure, please speak to the caretaker.</p>
 
     <h3>Who's coming?</h3>
     <div class="stepper-list">
@@ -315,7 +315,7 @@
   </div>
 </section>
 
-<script src="assets/config.js?v=18"></script>
-<script src="assets/checkin.js?v=18"></script>
+<script src="assets/config.js?v=19"></script>
+<script src="assets/checkin.js?v=19"></script>
 </body>
 </html>

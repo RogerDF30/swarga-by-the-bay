@@ -664,3 +664,4 @@ body.adm:not(.is-super) .super-only { display: none; }
 .og-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .danger-link { color: #b3261e !important; }
 #othersBlock #gAdd { margin-top: 10px; }
+.time-chip.fixed { cursor: default; border-style: solid; background: var(--foam); } .time-chip.fixed:hover { border-color: var(--line); }
