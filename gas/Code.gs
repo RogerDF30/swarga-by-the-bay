@@ -103,7 +103,8 @@ function doPost(e) {
       installTriggers: (b, s) => installTriggers_(s),
       resendEmail:     (b, s) => resendEmail_(b.id, s),
       deleteRecord:    (b, s) => deleteRecord_(b.kind, b.id, s),
-      deletedList:     (b, s) => deletedList_()
+      deletedList:     (b, s) => deletedList_(),
+      restoreRecord:   (b, s) => restoreRecord_(b.kind, b.id, s)
     };
     if (SUPER[a]) return json_(SUPER[a](body, requireSuper_(body.token)));
 

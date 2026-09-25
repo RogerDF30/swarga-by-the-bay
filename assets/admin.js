@@ -1160,7 +1160,8 @@
     } else if (actTab === 'deleted') {
       const r = await call('deletedList');
       $('#sBody').innerHTML = tabs + '<p class="fine">A full copy of every deleted record is kept in the "Deleted" tab of the Google Sheet.</p><div class="log-table">' + (r.rows.length ? r.rows.map(x =>
-        '<div class="lrow"><span class="lt">' + esc(x['Deleted At']) + '</span><span><b>' + esc(x.By) + '</b> deleted ' + esc(x.Kind) + ' <em>' + esc(x['Record ID']) + '</em><small>' + esc(x.Summary) + '</small></span></div>').join('') : '<p class="fine">Nothing deleted.</p>') + '</div>';
+        '<div class="lrow"><span class="lt">' + esc(x['Deleted At']) + '</span><span><b>' + esc(x.By) + '</b> deleted ' + esc(x.Kind) + ' <em>' + esc(x['Record ID']) + '</em><small>' + esc(x.Summary) + '</small></span>' +
+        ((x.Kind === 'checkin' || x.Kind === 'booking') && !/^Restored/.test(x.Summary) ? '<button type="button" class="chip-btn dark" data-restore="' + esc(x.Kind) + '|' + esc(x['Record ID']) + '">Restore</button>' : '') + '</div>').join('') : '<p class="fine">Nothing deleted.</p>') + '</div>';
     } else {
       const r = await call('emailLog');
       $('#sBody').innerHTML = tabs + '<div class="log-table">' + (r.rows.length ? r.rows.map(x =>
@@ -1218,6 +1219,8 @@
     }
     const tp = t.closest('[data-tpl]');
     if (tp) return templateForm(tp.dataset.tpl);
+    const rst = t.closest('[data-restore]');
+    if (rst) { const [kind, id] = rst.dataset.restore.split('|'); return busy(rst, async () => { await call('restoreRecord', { kind, id }); toast(id + ' restored.'); await quietReload(); await renderActivity(); }); }
     const rs = t.closest('[data-resend]');
     if (rs) return busy(rs, async () => { await call('resendEmail', { id: rs.dataset.resend }); toast('Email sent.'); await renderActivity(); });
   });

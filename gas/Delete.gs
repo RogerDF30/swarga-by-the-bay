@@ -121,3 +121,36 @@ function deletedList_() {
   const rows = readAll_(DELETED, DELETED_HEADERS).map(r => { const c = strip_(r); delete c.Data; return c; }).reverse();
   return { ok: true, rows: rows.slice(0, 300) };
 }
+
+/* ---------- restore (Super admin) ---------- */
+
+/** Puts a deleted check-in or booking back from the "Deleted" sheet and restores its files from Drive trash. */
+function restoreRecord_(kind, id, sess) {
+  if (['checkin', 'booking'].indexOf(kind) === -1) throw new Error('Only check-ins and bookings can be restored.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const rec = readAll_(DELETED, DELETED_HEADERS).filter(r => r.Kind === kind && r['Record ID'] === id && !/^Restored/.test(r.Summary)).pop();
+    if (!rec) throw new Error('No deleted copy found for ' + id + '.');
+    const data = JSON.parse(table_(DELETED, DELETED_HEADERS).getRange(rec._row, DELETED_HEADERS.indexOf('Data') + 1).getValue());
+    const keep = (v) => (v === '' || v == null) ? '' : "'" + String(v);
+    if (kind === 'checkin') {
+      try { findRow_(id); throw new Error('EXISTS'); } catch (e) { if (e.message === 'EXISTS') throw new Error(id + ' is already in the guest log.'); }
+      const c = data.checkin;
+      sheet_().appendRow(HEADERS.map(h => keep(c[h])));
+      (data.guests || []).forEach(g => appendObj_(GUESTS, GUEST_HEADERS, Object.fromEntries(GUEST_HEADERS.map(h => [h, keep(g[h])]))));
+      [c['ID Photo File ID']].concat((data.guests || []).map(g => g['ID Photo File ID'])).filter(Boolean)
+        .forEach(f => { try { DriveApp.getFileById(f).setTrashed(false); } catch (e) {} });
+      if (c['Booking ID']) {
+        const b = readAll_(BOOKINGS, BOOKING_HEADERS).filter(x => x['Booking ID'] === c['Booking ID'])[0];
+        if (b && !b['Check-in Ref']) writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, { 'Check-in Ref': id });
+      }
+    } else {
+      if (readAll_(BOOKINGS, BOOKING_HEADERS).some(x => x['Booking ID'] === id)) throw new Error(id + ' already exists.');
+      appendObj_(BOOKINGS, BOOKING_HEADERS, Object.fromEntries(BOOKING_HEADERS.map(h => [h, keep(data.booking[h])])));
+      (data.payments || []).forEach(p => appendObj_(PAYMENTS, PAYMENT_HEADERS, Object.fromEntries(PAYMENT_HEADERS.map(h => [h, keep(p[h])]))));
+    }
+    writeFields_(DELETED, DELETED_HEADERS, rec._row, { 'Summary': 'Restored ' + stamp_().slice(1) + ' by ' + sess.name + ' · ' + rec.Summary });
+    audit_(sess, kind + '.restore', id, rec.Summary);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
