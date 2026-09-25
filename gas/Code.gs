@@ -24,8 +24,11 @@ const HEADERS = [
   'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
   'Vehicle Numbers',   // columns below were appended later; keep new columns at the end
   'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By',
-  'Booking ID'
+  'Booking ID', 'Other Guests'
 ];
+const GUESTS = 'Guests';
+const GUEST_HEADERS = ['Guest ID', 'Submission ID', 'No.', 'Kind', 'Name', 'Age', 'ID Type', 'ID Number', 'ID Photo File ID', 'Added At'];
+const ID_TYPES = ['Aadhaar', 'Passport', 'Driving Licence', 'Voter ID', 'PAN', 'Other'];
 
 /* ---------- one-time setup ---------- */
 
@@ -112,6 +115,8 @@ function doPost(e) {
       sendForBooking: (b, s) => sendForBooking_(b.key, b.id, s),
       list:           (b, s) => list_(),
       photo:          (b, s) => photo_(b.id),
+      guests:         (b, s) => ({ ok: true, guests: guestsOf_(b.id) }),
+      guestPhoto:     (b, s) => guestPhoto_(b.id),
       verify:         (b, s) => verify_(b.id, s),
       vehicles:       (b, s) => updateVehicles_(b.id, b.count, b.numbers, s),
       stay:           (b, s) => stay_(b.id, b.move, s),
@@ -139,22 +144,25 @@ function submit_(d) {
                'idType', 'idNumber', 'emergencyName', 'emergencyPhone', 'declarationName'];
   req.forEach(k => { if (!String(d[k] || '').trim()) throw new Error('Missing field: ' + k); });
   if (!String(d.email || '').trim()) throw new Error('Email is required.');
+  if (!d.idPhoto || !d.idPhoto.data) throw new Error('Please add a photo of your ID proof.');
+  const others = checkOtherGuests_(d);
   ['ackHouse', 'ackSea', 'ackWeather', 'ackLiability', 'ackData', 'declarationAgreed']
     .forEach(k => { if (d[k] !== true) throw new Error('All acknowledgements are required.'); });
   if (!/^\+?[0-9 ]{8,16}$/.test(d.mobile)) throw new Error('Invalid mobile number.');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(d.email).trim())) throw new Error('Invalid email.');
   if (d.checkOutDate < d.checkInDate) throw new Error('Check-out is before check-in.');
 
+  let booking = null;
+  const bookingId = /^SBK-\d{6}-[A-Z0-9]{6}$/.test(String(d.bookingId || '').toUpperCase()) ? String(d.bookingId).toUpperCase() : '';
+  const id = 'SBB-' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyMMdd') + '-' +
+             Utilities.getUuid().slice(0, 6).toUpperCase();
+  // Save ID files before taking the lock: uploads are slow and must not block other guests.
+  const fileId = savePhoto_(id, d.guestName, d.idPhoto);
+  others.forEach((g, i) => { g.fileId = g.idPhoto ? savePhoto_(id + '-G' + (i + 2), g.name, g.idPhoto) : ''; });
+
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
-  let id, booking = null;
-  const bookingId = /^SBK-\d{6}-[A-Z0-9]{6}$/.test(String(d.bookingId || '').toUpperCase()) ? String(d.bookingId).toUpperCase() : '';
   try {
-    id = 'SBB-' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyMMdd') + '-' +
-               Utilities.getUuid().slice(0, 6).toUpperCase();
-
-    let fileId = '';
-    if (d.idPhoto && d.idPhoto.data) fileId = savePhoto_(id, d.guestName, d.idPhoto);
 
     const row = [
       id, new Date(),
@@ -169,8 +177,17 @@ function submit_(d) {
       '', '', 'Pending', clean_(d.userAgent).slice(0, 200),
       plates_(d.vehicleNumbers),
       'Expected', '', '', '', '',
-      bookingId
+      bookingId,
+      others.map(g => g.name + (g.kind === 'Child' ? ' (child, ' + g.age + ')' : ' (' + g.idType + ')')).join('; ')
     ];
+    others.forEach((g, i) => {
+      appendObj_(GUESTS, GUEST_HEADERS, {
+        'Guest ID': id + '-G' + (i + 2), 'Submission ID': id, 'No.': i + 2, 'Kind': g.kind, 'Name': g.name,
+        'Age': g.kind === 'Child' ? g.age : '', 'ID Type': g.idType, 'ID Number': g.idNumber,
+        'ID Photo File ID': g.fileId,
+        'Added At': stamp_()
+      });
+    });
     sheet_().appendRow(row);
     if (bookingId) booking = linkCheckin_(bookingId, id, clean_(d.email));
   } finally {
@@ -193,6 +210,45 @@ function savePhoto_(id, name, photo) {
   const blob = Utilities.newBlob(bytes, photo.mime, id + '_' + clean_(name).replace(/[^\w]+/g, '_') + '.' + ext);
   const folder = DriveApp.getFolderById(prop_('ID_FOLDER_ID'));
   return folder.createFile(blob).getId(); // stays private to the script owner
+}
+
+/**
+ * Every guest beyond the primary one must be listed.
+ * Adults: name, ID type, ID number and ID photo. Children: name and age (ID optional).
+ */
+function checkOtherGuests_(d) {
+  const adults = num_(d.adults), kids = num_(d.children);
+  const list = Array.isArray(d.guests) ? d.guests : [];
+  const needAdults = Math.max(0, adults - 1);
+  const gotAdults = list.filter(g => g && g.kind === 'Adult'), gotKids = list.filter(g => g && g.kind === 'Child');
+  if (gotAdults.length !== needAdults || gotKids.length !== kids) throw new Error('Please add the details of every guest (' + needAdults + ' more adult' + (needAdults === 1 ? '' : 's') + ', ' + kids + ' child' + (kids === 1 ? '' : 'ren') + ').');
+  return gotAdults.concat(gotKids).map((g, i) => {
+    const name = clean_(g.name).slice(0, 120);
+    const who = 'Guest ' + (i + 2);
+    if (!name) throw new Error(who + ': name is required.');
+    if (g.kind === 'Adult') {
+      if (ID_TYPES.indexOf(g.idType) === -1) throw new Error(name + ': choose the ID type.');
+      if (!String(g.idNumber || '').trim()) throw new Error(name + ': ID number is required.');
+      if (!g.idPhoto || !g.idPhoto.data) throw new Error(name + ': ID proof photo is required.');
+      return { kind: 'Adult', name: name, idType: g.idType, idNumber: txt_(g.idNumber).slice(0, 40), idPhoto: g.idPhoto };
+    }
+    const age = Number(g.age);
+    if (!(age >= 0 && age <= 17) || String(g.age).trim() === '') throw new Error(name + ': enter an age from 0 to 17.');
+    return { kind: 'Child', name: name, age: Math.floor(age), idType: ID_TYPES.indexOf(g.idType) > -1 && g.idNumber ? g.idType : '', idNumber: g.idType && g.idNumber ? txt_(g.idNumber).slice(0, 40) : '', idPhoto: g.idPhoto && g.idPhoto.data ? g.idPhoto : null };
+  });
+}
+
+/** Admin: other guests on a check-in, with an ID photo flag (no image data). */
+function guestsOf_(submissionId) {
+  return readAll_(GUESTS, GUEST_HEADERS).filter(g => g['Submission ID'] === submissionId)
+    .map(g => ({ id: g['Guest ID'], no: g['No.'], kind: g.Kind, name: g.Name, age: g.Age, idType: g['ID Type'], idNumber: g['ID Number'], hasPhoto: !!g['ID Photo File ID'] }));
+}
+
+function guestPhoto_(guestId) {
+  const g = readAll_(GUESTS, GUEST_HEADERS).filter(x => x['Guest ID'] === guestId)[0];
+  if (!g || !g['ID Photo File ID']) return { ok: true, photo: null };
+  const blob = DriveApp.getFileById(g['ID Photo File ID']).getBlob();
+  return { ok: true, photo: { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) } };
 }
 
 /* ---------- admin ---------- */

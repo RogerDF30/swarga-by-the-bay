@@ -87,6 +87,7 @@
       minus.disabled = v <= min;
       plus.disabled = v >= max;
       if (name === 'vehicles') renderPlates(v);
+      if (name === 'adults' || name === 'children') renderGuests();
     };
     st.addEventListener('click', e => {
       const b = e.target.closest('button');
@@ -116,6 +117,63 @@
       e.target.setSelectionRange(pos, pos);
     }
   });
+
+  /* ---------- other guests ---------- */
+  var ID_TYPES = ['Aadhaar', 'Passport', 'Driving Licence', 'Voter ID', 'PAN', 'Other'];
+  var others = []; // { kind, name, age, idType, idNumber, file }
+  function renderGuests() {
+    if (!others || !f.adults || !f.children) return;
+    const na = Math.max(0, +f.adults.value - 1), nc = +f.children.value;
+    const adults = others.filter(g => g.kind === 'Adult'), kids = others.filter(g => g.kind === 'Child');
+    while (adults.length < na) adults.push({ kind: 'Adult', name: '', idType: '', idNumber: '', file: null });
+    while (kids.length < nc) kids.push({ kind: 'Child', name: '', age: '', file: null });
+    others.length = 0;
+    others.push(...adults.slice(0, na), ...kids.slice(0, nc));
+    const list = $('#guestList');
+    if (!list) return;
+    list.innerHTML = others.map((g, i) => {
+      const n = i + 2, k = 'g' + i;
+      const drop = '<label class="dropzone mini' + (g.file ? ' has-file' : '') + '" data-i="' + i + '"><input type="file" data-i="' + i + '" data-k="file" accept="image/jpeg,image/png,application/pdf">' +
+        '<span class="dz-text">' + (g.file ? '✓ ' + esc(g.file.name) + ' · <u>Change</u>' : '📷 ' + (g.kind === 'Adult' ? 'Add ID photo <em class="req">required</em>' : 'Add ID photo (optional)')) + '</span></label>';
+      return '<div class="gform" data-i="' + i + '"><h3 class="g-head"><span class="g-num">' + n + '</span> ' + (g.kind === 'Adult' ? 'Adult' : 'Child') + '</h3>' +
+        '<div class="field"><input id="' + k + 'n" data-i="' + i + '" data-k="name" maxlength="120" placeholder=" " value="' + esc(g.name) + '"><label for="' + k + 'n">Full name</label></div>' +
+        (g.kind === 'Adult'
+          ? '<div class="field sel-field"><select id="' + k + 't" data-i="' + i + '" data-k="idType"><option value="">Choose…</option>' + ID_TYPES.map(t => '<option' + (t === g.idType ? ' selected' : '') + '>' + t + '</option>').join('') + '</select><label for="' + k + 't">ID type</label></div>' +
+            '<div class="field"><input id="' + k + 'd" data-i="' + i + '" data-k="idNumber" maxlength="40" autocomplete="off" placeholder=" " value="' + esc(g.idNumber) + '"><label for="' + k + 'd">ID number</label></div>'
+          : '<div class="field"><input id="' + k + 'a" data-i="' + i + '" data-k="age" type="number" inputmode="numeric" min="0" max="17" placeholder=" " value="' + esc(g.age) + '"><label for="' + k + 'a">Age</label></div>') +
+        drop + '</div>';
+    }).join('');
+  }
+  $('#guestList').addEventListener('input', e => { const i = e.target.dataset.i, k = e.target.dataset.k; if (i != null && k && k !== 'file') others[+i][k] = e.target.value; });
+  $('#guestList').addEventListener('change', e => {
+    const t = e.target, i = t.dataset.i;
+    if (i == null) return;
+    if (t.dataset.k === 'idType') others[+i].idType = t.value;
+    if (t.dataset.k === 'file' && t.files[0]) {
+      const file = t.files[0];
+      if (!/^(image\/(jpeg|png)|application\/pdf)$/.test(file.type)) return toast('Please use a JPG, PNG or PDF file.');
+      if (file.type === 'application/pdf' && file.size > MAX_BYTES) return toast('That PDF is larger than 5 MB.');
+      others[+i].file = file;
+      renderGuests();
+    }
+  });
+  function validateGuests() {
+    for (let i = 0; i < others.length; i++) {
+      const g = others[i], box = $('.gform[data-i="' + i + '"]'), who = 'guest ' + (i + 2);
+      const bad = (sel, text) => fail($(sel, box).closest('.field, .dropzone'), text, $(sel, box));
+      if (!g.name.trim()) return bad('[data-k=name]', 'Please enter the full name of ' + who + '.');
+      if (g.kind === 'Adult') {
+        if (!g.idType) return bad('[data-k=idType]', 'Please choose the ID type for ' + g.name + '.');
+        if (!g.idNumber.trim()) return bad('[data-k=idNumber]', 'Please enter the ID number for ' + g.name + '.');
+        if (!g.file) return bad('[data-k=file]', 'Please add an ID photo for ' + g.name + '.');
+      } else {
+        const a = String(g.age).trim();
+        if (a === '' || !(+a >= 0 && +a <= 17)) return bad('[data-k=age]', 'Please enter an age from 0 to 17 for ' + g.name + '.');
+      }
+    }
+    return true;
+  }
+  renderGuests();
 
   /* ---------- ID dropzone ---------- */
   const dz = $('#dropzone');
@@ -202,6 +260,7 @@
       item('Check-out', fmtDate(f.checkOutDate.value) + ' · ' + fmtTime(f.checkOutTime.value), 0) +
       (+f.vehicles.value ? item('Vehicles', f.vehicles.value + (plates().length ? ' · ' + plates().join(', ') : ' · number not given'), 0) : '') +
       item('ID', f.idType.value + ' · ' + f.idNumber.value, 2) +
+      (others.length ? item('Other guests', others.map(g => g.name + (g.kind === 'Child' ? ' (' + g.age + ')' : '')).join(', '), 2) : '') +
       item('Emergency', f.emergencyName.value + ' · ' + f.emergencyPhone.value, 1);
   }
   $('#summary').addEventListener('click', e => {
@@ -230,6 +289,7 @@
     s.classList.toggle('back', !!backward);
     $$('.rules li', s).forEach((li, n) => { li.style.animationDelay = Math.min(n * 40, 600) + 'ms'; });
     if (i === TOTAL - 1) renderSummary();
+    if (s.dataset.step === '3') $('#youName').textContent = f.guestName.value.trim();
     syncSide(i);
     $('#stepCount').textContent = (i + 1) + ' / ' + TOTAL;
     $('#progressFill').style.width = ((i + 1) / TOTAL * 100) + '%';
@@ -260,6 +320,12 @@
       }
     }
     if (step.dataset.step === '1' && f.checkOutDate.value < f.checkInDate.value) return fail(f.checkOutDate, 'Check-out must be after check-in.');
+    if (step.dataset.step === '3') {
+      if (!idFile) return fail(dz, 'Please add a photo of your ID proof.');
+      if (!validateGuests()) return false;
+      const bytes = [idFile].concat(others.map(g => g.file)).filter(Boolean).reduce((s, x) => s + (x.type === 'application/pdf' ? x.size : 400000), 0);
+      if (bytes > 35 * 1024 * 1024) return fail(dz, 'The ID files are too large together. Please use photos instead of PDFs.');
+    }
     return true;
   }
 
@@ -309,6 +375,7 @@
         checkOutDate: f.checkOutDate.value, checkOutTime: f.checkOutTime.value,
         idType: f.idType.value, idNumber: f.idNumber.value,
         idPhoto: await readFile(idFile),
+        guests: await Promise.all(others.map(async g => ({ kind: g.kind, name: g.name, age: g.age, idType: g.idType || '', idNumber: g.idNumber || '', idPhoto: await readFile(g.file) }))),
         emergencyName: f.emergencyName.value, emergencyPhone: f.emergencyPhone.value,
         ackHouse: f.ackHouse.checked, ackSea: f.ackSea.checked, ackWeather: f.ackWeather.checked,
         ackLiability: f.ackLiability.checked, ackData: f.ackData.checked,

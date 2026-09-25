@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=11">
+<link rel="stylesheet" href="assets/style.css?v=12">
 </head>
 <body class="guest-page">
 
@@ -121,10 +121,11 @@
   </section>
 
   <!-- STEP 3: ID -->
-  <section class="step" data-step="3" data-title="ID proof">
+  <section class="step" data-step="3" data-title="Guest IDs">
     <p class="kicker">Step 3</p>
-    <h2>Verify your ID</h2>
-    <p class="fine">Required for guest registration. Stored privately and visible only to management.</p>
+    <h2>ID for every guest</h2>
+    <p class="fine">Required for guest registration: a name and ID proof for every adult, and a name and age for every child. Stored privately and visible only to management.</p>
+    <h3 class="g-head"><span class="g-num">1</span> You <small id="youName"></small></h3>
     <div class="chips" role="radiogroup" aria-label="ID type">
       <label class="chip"><input type="radio" name="idType" value="Aadhaar" required><span>Aadhaar</span></label>
       <label class="chip"><input type="radio" name="idType" value="Passport"><span>Passport</span></label>
@@ -138,11 +139,12 @@
       <input name="idPhoto" type="file" accept="image/jpeg,image/png,application/pdf">
       <div class="dz-empty">
         <span class="dz-icon">📷</span>
-        <strong>Add a photo of your ID</strong>
+        <strong>Add a photo of your ID <em class="req">required</em></strong>
         <small>Take a picture or upload · JPG, PNG or PDF · max 5 MB</small>
       </div>
       <div class="dz-preview hidden"><img alt="ID preview"><span class="dz-name"></span><span class="dz-change">Change</span></div>
     </label>
+    <div id="guestList" class="guest-forms"></div>
   </section>
 
   <!-- STEP 4: HOUSE RULES -->
@@ -314,7 +316,7 @@
   </div>
 </section>
 
-<script src="assets/config.js?v=11"></script>
-<script src="assets/checkin.js?v=11"></script>
+<script src="assets/config.js?v=12"></script>
+<script src="assets/checkin.js?v=12"></script>
 </body>
 </html>

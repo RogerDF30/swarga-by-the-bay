@@ -233,6 +233,7 @@
       ? '<button type="button" class="hist" data-open-booking="' + esc(bk) + '"><b>' + esc(bk) + ' · ' + esc(bObj.Status) + '</b><small>' + esc(roomNames(bObj['Room IDs']) || 'No room') + ' · ' + esc(bObj['Payment Status']) + '</small></button>'
       : '<p class="fine">' + esc(bk) + ' (booking not found)</p>') : '';
     renderVehicles(false);
+    renderOthers();
     $('#idProof').innerHTML = col(current, 'ID Photo File ID')
       ? '<button type="button" class="chip-btn dark" id="loadPhoto">View ID proof</button>'
       : '<p class="fine">No file uploaded.</p>';
@@ -241,6 +242,24 @@
       : '<p class="fine">Recorded as <b>' + esc(staffName) + '</b> once you confirm the ID matches the guest.</p><button type="button" class="btn btn-sea wide" id="verifyBtn">Mark as verified</button>';
     if (!$('#detail').open) $('#detail').showModal();
     $('.drawer-body').scrollTop = 0;
+  }
+
+  /* ---------- other guests ---------- */
+  async function renderOthers() {
+    const sid = col(current, 'Submission ID');
+    const summary = col(current, 'Other Guests');
+    const need = Math.max(0, (+col(current, 'Adults') || 0) - 1) + (+col(current, 'Children') || 0);
+    $('#othersSec').classList.toggle('hidden', !summary && !need);
+    if (!summary) { $('#othersBlock').innerHTML = need ? '<p class="fine">Not recorded (this check-in was made before every guest\'s details were required).</p>' : ''; return; }
+    $('#othersBlock').innerHTML = '<div class="skeleton"></div>';
+    try {
+      const list = (await call('guests', { id: sid })).guests;
+      if (col(current, 'Submission ID') !== sid) return;
+      $('#othersBlock').innerHTML = list.map(g =>
+        '<div class="oguest"><div><b>' + esc(g.no) + '. ' + esc(g.name) + '</b><small>' + (g.kind === 'Child' ? 'Child · age ' + esc(g.age) : 'Adult') +
+        (g.idType ? ' · ' + esc(g.idType) + ' ' + esc(g.idNumber) : '') + '</small></div>' +
+        (g.hasPhoto ? '<button type="button" class="chip-btn dark" data-gphoto="' + esc(g.id) + '">View ID proof</button>' : '<span class="fine">No ID file</span>') + '</div>').join('');
+    } catch (err) { $('#othersBlock').innerHTML = '<p class="fine">' + esc(summary) + '</p>'; }
   }
 
   /* ---------- stay actions ---------- */
@@ -335,6 +354,20 @@
     if (ob) { $('#detail').close(); return openBooking(ob.dataset.openBooking); }
     const h = e.target.closest('.hist');
     if (h) { current = rows.find(r => col(r, 'Submission ID') === h.dataset.id); return openDetail(); }
+    const gp = e.target.closest('[data-gphoto]');
+    if (gp) {
+      gp.disabled = true; gp.textContent = 'Loading…';
+      try {
+        const p = (await call('guestPhoto', { id: gp.dataset.gphoto })).photo;
+        const box = gp.parentElement;
+        if (!p) { gp.outerHTML = '<span class="fine">No file.</span>'; return; }
+        const src = 'data:' + p.mime + ';base64,' + p.data;
+        gp.outerHTML = p.mime === 'application/pdf'
+          ? '<a class="chip-btn dark" download="' + esc(gp.dataset.gphoto) + '.pdf" href="' + src + '">⬇ Download ID (PDF)</a>'
+          : '<img class="idimg" alt="ID proof" src="' + src + '">';
+      } catch (err) { toast(err.message); gp.disabled = false; gp.textContent = 'View ID proof'; }
+      return;
+    }
     if (e.target.id === 'loadPhoto') {
       e.target.disabled = true;
       e.target.textContent = 'Loading…';
