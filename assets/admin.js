@@ -257,7 +257,7 @@
       if (col(current, 'Submission ID') !== sid) return;
       $('#othersBlock').innerHTML = list.map(g =>
         '<div class="oguest"><div><b>' + esc(g.no) + '. ' + esc(g.name) + '</b><small>' + (g.kind === 'Child' ? 'Child · age ' + esc(g.age) : 'Adult') +
-        (g.idType ? ' · ' + esc(g.idType) + ' ' + esc(g.idNumber) : '') + '</small></div>' +
+        (g.idType ? ' · ' + esc(g.idType) + (g.idNumber ? ' ' + esc(g.idNumber) : '') : '') + '</small></div>' +
         (g.hasPhoto ? '<button type="button" class="chip-btn dark" data-gphoto="' + esc(g.id) + '">View ID proof</button>' : '<span class="fine">No ID file</span>') + '</div>').join('');
     } catch (err) { $('#othersBlock').innerHTML = '<p class="fine">' + esc(summary) + '</p>'; }
   }

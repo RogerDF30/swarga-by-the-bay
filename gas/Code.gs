@@ -143,7 +143,7 @@ function doPost(e) {
 
 function submit_(d) {
   const req = ['guestName', 'mobile', 'adults', 'checkInDate', 'checkOutDate',
-               'idType', 'idNumber', 'emergencyName', 'emergencyPhone', 'declarationName'];
+               'idType', 'emergencyName', 'emergencyPhone', 'declarationName'];
   req.forEach(k => { if (!String(d[k] || '').trim()) throw new Error('Missing field: ' + k); });
   if (!String(d.email || '').trim()) throw new Error('Email is required.');
   if (!d.idPhoto || !d.idPhoto.data) throw new Error('Please add a photo of your ID proof.');
@@ -233,13 +233,12 @@ function checkOtherGuests_(d) {
     if (!name) throw new Error(who + ': name is required.');
     if (g.kind === 'Adult') {
       if (ID_TYPES.indexOf(g.idType) === -1) throw new Error(name + ': choose the ID type.');
-      if (!String(g.idNumber || '').trim()) throw new Error(name + ': ID number is required.');
       if (!g.idPhoto || !g.idPhoto.data) throw new Error(name + ': ID proof photo is required.');
-      return { kind: 'Adult', name: name, idType: g.idType, idNumber: txt_(g.idNumber).slice(0, 40), idPhoto: g.idPhoto };
+      return { kind: 'Adult', name: name, idType: g.idType, idNumber: String(g.idNumber || '').trim() ? txt_(g.idNumber).slice(0, 40) : '', idPhoto: g.idPhoto };
     }
     const age = Number(g.age);
     if (!(age >= 0 && age <= 17) || String(g.age).trim() === '') throw new Error(name + ': enter an age from 0 to 17.');
-    return { kind: 'Child', name: name, age: Math.floor(age), idType: ID_TYPES.indexOf(g.idType) > -1 && g.idNumber ? g.idType : '', idNumber: g.idType && g.idNumber ? txt_(g.idNumber).slice(0, 40) : '', idPhoto: g.idPhoto && g.idPhoto.data ? g.idPhoto : null };
+    return { kind: 'Child', name: name, age: Math.floor(age), idType: '', idNumber: '', idPhoto: g.idPhoto && g.idPhoto.data ? g.idPhoto : null };
   });
 }
 

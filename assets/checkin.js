@@ -139,7 +139,7 @@
         '<div class="field"><input id="' + k + 'n" data-i="' + i + '" data-k="name" maxlength="120" placeholder=" " value="' + esc(g.name) + '"><label for="' + k + 'n">Full name</label></div>' +
         (g.kind === 'Adult'
           ? '<div class="field sel-field"><select id="' + k + 't" data-i="' + i + '" data-k="idType"><option value="">Choose…</option>' + ID_TYPES.map(t => '<option' + (t === g.idType ? ' selected' : '') + '>' + t + '</option>').join('') + '</select><label for="' + k + 't">ID type</label></div>' +
-            '<div class="field"><input id="' + k + 'd" data-i="' + i + '" data-k="idNumber" maxlength="40" autocomplete="off" placeholder=" " value="' + esc(g.idNumber) + '"><label for="' + k + 'd">ID number</label></div>'
+            ''
           : '<div class="field"><input id="' + k + 'a" data-i="' + i + '" data-k="age" type="number" inputmode="numeric" min="0" max="17" placeholder=" " value="' + esc(g.age) + '"><label for="' + k + 'a">Age</label></div>') +
         drop + '</div>';
     }).join('');
@@ -164,7 +164,6 @@
       if (!g.name.trim()) return bad('[data-k=name]', 'Please enter the full name of ' + who + '.');
       if (g.kind === 'Adult') {
         if (!g.idType) return bad('[data-k=idType]', 'Please choose the ID type for ' + g.name + '.');
-        if (!g.idNumber.trim()) return bad('[data-k=idNumber]', 'Please enter the ID number for ' + g.name + '.');
         if (!g.file) return bad('[data-k=file]', 'Please add an ID photo for ' + g.name + '.');
       } else {
         const a = String(g.age).trim();
@@ -259,7 +258,7 @@
       item('Check-in', fmtDate(f.checkInDate.value) + ' · ' + fmtTime(f.checkInTime.value), 0) +
       item('Check-out', fmtDate(f.checkOutDate.value) + ' · ' + fmtTime(f.checkOutTime.value), 0) +
       (+f.vehicles.value ? item('Vehicles', f.vehicles.value + (plates().length ? ' · ' + plates().join(', ') : ' · number not given'), 0) : '') +
-      item('ID', f.idType.value + ' · ' + f.idNumber.value, 2) +
+      item('ID', f.idType.value + ' · photo added', 2) +
       (others.length ? item('Other guests', others.map(g => g.name + (g.kind === 'Child' ? ' (' + g.age + ')' : '')).join(', '), 2) : '') +
       item('Emergency', f.emergencyName.value + ' · ' + f.emergencyPhone.value, 1);
   }
@@ -373,9 +372,9 @@
         bookingId: bookingId,
         checkInDate: f.checkInDate.value, checkInTime: f.checkInTime.value,
         checkOutDate: f.checkOutDate.value, checkOutTime: f.checkOutTime.value,
-        idType: f.idType.value, idNumber: f.idNumber.value,
+        idType: f.idType.value,
         idPhoto: await readFile(idFile),
-        guests: await Promise.all(others.map(async g => ({ kind: g.kind, name: g.name, age: g.age, idType: g.idType || '', idNumber: g.idNumber || '', idPhoto: await readFile(g.file) }))),
+        guests: await Promise.all(others.map(async g => ({ kind: g.kind, name: g.name, age: g.age, idType: g.idType || '', idPhoto: await readFile(g.file) }))),
         emergencyName: f.emergencyName.value, emergencyPhone: f.emergencyPhone.value,
         ackHouse: f.ackHouse.checked, ackSea: f.ackSea.checked, ackWeather: f.ackWeather.checked,
         ackLiability: f.ackLiability.checked, ackData: f.ackData.checked,
