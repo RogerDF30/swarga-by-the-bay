@@ -188,8 +188,8 @@ function checkinPdf_(submissionId, sess) {
   const sec = CONSENT_TEXT.sections, ex = CONSENT_TEXT.extra;
   const html = '<html><head><meta charset="utf-8"><style>' +
     'body{font-family:Helvetica,Arial,sans-serif;font-size:10.5pt;color:#17252b;line-height:1.45}' +
-    '.brand{background:#0b3d52;color:#fff;padding:14px 18px;border-radius:8px}.brand b{font-family:Georgia,serif;font-size:18pt}.brand i{font-family:Georgia,serif}' +
-    '.brand small{display:block;opacity:.85;font-size:9pt}' +
+    '.brand{color:#0b3d52;padding:0 0 8px;border-bottom:3px solid #2aa6a8}.brand b{font-family:Georgia,serif;font-size:20pt}.brand i{font-family:Georgia,serif;font-size:13pt;color:#11607a}' +
+    '.brand small{display:block;color:#62727a;font-size:9pt;margin-top:2px}' +
     'h2{font-family:Georgia,serif;color:#0b3d52;font-size:14pt;margin:18px 0 6px;border-bottom:2px solid #2aa6a8;padding-bottom:3px}' +
     'h3{font-family:Georgia,serif;color:#0b3d52;font-size:12pt;margin:14px 0 4px}h4{margin:8px 0 2px;font-size:10.5pt}' +
     'table{width:100%;border-collapse:collapse;margin:4px 0}th,td{text-align:left;vertical-align:top;padding:4px 6px;border-bottom:1px solid #e3e7e8;font-size:10pt}th{width:34%;color:#62727a;font-weight:normal}' +
