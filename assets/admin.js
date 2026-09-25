@@ -368,6 +368,7 @@
       } catch (err) { toast(err.message); gp.disabled = false; gp.textContent = 'View ID proof'; }
       return;
     }
+    if (e.target.id === 'pdfBtn') return downloadCheckinPdf(col(current, 'Submission ID'), e.target);
     if (e.target.id === 'delCheckin') {
       const sid = col(current, 'Submission ID');
       return confirmDelete('checkin', sid, 'Delete check-in ' + sid + '?', col(current, 'Guest Name') + ' · ' + niceDate(col(current, 'Check-in Date')) + ' → ' + niceDate(col(current, 'Check-out Date')) + '. The check-in, the other guests and all ID files are removed (ID files go to Drive trash for 30 days).', () => { $('#detail').close(); current = null; });
@@ -644,7 +645,7 @@
       (b['Check-in Ref']
         ? '<button type="button" class="hist" data-open-log="' + esc(b['Check-in Ref']) + '"><b>Received · ' + esc(b['Check-in Ref']) + '</b><small>' + (logRow ? esc(col(logRow, 'Status')) + ' ID · ' + esc(col(logRow, 'Stay Status') || 'Expected') : 'Open in guest log') + '</small></button>'
         : '<p class="fine">Not received yet. Send the guest their check-in link:</p>') +
-      '<div class="act-row"><a class="chip-btn dark" target="_blank" rel="noopener" href="' + esc(wa) + '">💬 WhatsApp link</a><button type="button" class="chip-btn dark" id="copyLink" data-link="' + esc(link) + '">🔗 Copy link</button></div></section>' +
+      '<div class="act-row">' + (b['Check-in Ref'] ? '<button type="button" class="chip-btn dark" id="bkPdf">⬇ Check-in PDF</button>' : '') + '<a class="chip-btn dark" target="_blank" rel="noopener" href="' + esc(wa) + '">💬 WhatsApp link</a><button type="button" class="chip-btn dark" id="copyLink" data-link="' + esc(link) + '">🔗 Copy link</button></div></section>' +
 
       '<section class="dsec"><div class="dsec-head"><h3>🛏️ Booking details</h3><button type="button" class="link-btn" id="editBooking">Edit</button></div><dl>' +
       '<dt>Mobile</dt><dd><a href="tel:' + esc(phone) + '">' + esc(b.Mobile) + '</a></dd>' +
@@ -702,6 +703,7 @@
       }
       const ml = t.closest('[data-mail]');
       if (ml) return busy(ml, async () => { await call('sendForBooking', { key: ml.dataset.mail, id: openBookingId }); toast('Email sent to ' + b.Email + '.'); });
+      if (t.id === 'bkPdf') return downloadCheckinPdf(b['Check-in Ref'], t);
       if (t.id === 'copyLink') {
         try { await navigator.clipboard.writeText(t.dataset.link); toast('Check-in link copied.'); }
         catch (err) { window.prompt('Copy this link', t.dataset.link); }
@@ -1259,6 +1261,26 @@
       if (t.id === 'tpReset') return save({ reset: true });
     }
   });
+
+  /* ---------- check-in PDF ---------- */
+  function saveB64(name, mime, b64) {
+    const bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  async function downloadCheckinPdf(id, btn) {
+    const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing PDF…';
+    try {
+      const r = await call('checkinPdf', { id });
+      saveB64(r.name, 'application/pdf', r.data);
+      (r.attachments || []).forEach((f, i) => setTimeout(() => saveB64(id + ' ID ' + (i + 1) + ' - ' + f.label.replace(/[^\w ]+/g, '').trim() + '.pdf', f.mime, f.data), 600 * (i + 1)));
+      toast('PDF downloaded' + (r.attachments && r.attachments.length ? ' with ' + r.attachments.length + ' separate PDF ID file(s).' : '.'));
+    } catch (err) { toast(err.message); }
+    finally { btn.disabled = false; btn.textContent = label; }
+  }
 
   /* ---------- delete (Super admin) ---------- */
   let cfJob = null;

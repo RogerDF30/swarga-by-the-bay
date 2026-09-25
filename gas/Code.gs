@@ -24,7 +24,7 @@ const HEADERS = [
   'Rep Name', 'Rep Verified At', 'Status', 'User Agent',
   'Vehicle Numbers',   // columns below were appended later; keep new columns at the end
   'Stay Status', 'Actual Check-in', 'Checked-in By', 'Actual Check-out', 'Checked-out By',
-  'Booking ID', 'Other Guests'
+  'Booking ID', 'Other Guests', 'Consent Version'
 ];
 const GUESTS = 'Guests';
 const GUEST_HEADERS = ['Guest ID', 'Submission ID', 'No.', 'Kind', 'Name', 'Age', 'ID Type', 'ID Number', 'ID Photo File ID', 'Added At'];
@@ -119,6 +119,7 @@ function doPost(e) {
       photo:          (b, s) => photo_(b.id),
       guests:         (b, s) => ({ ok: true, guests: guestsOf_(b.id) }),
       guestPhoto:     (b, s) => guestPhoto_(b.id),
+      checkinPdf:     (b, s) => checkinPdf_(b.id, s),
       verify:         (b, s) => verify_(b.id, s),
       vehicles:       (b, s) => updateVehicles_(b.id, b.count, b.numbers, s),
       stay:           (b, s) => stay_(b.id, b.move, s),
@@ -183,7 +184,8 @@ function submit_(d) {
       plates_(d.vehicleNumbers),
       'Expected', '', '', '', '',
       bookingId,
-      others.map(g => g.name + (g.kind === 'Child' ? ' (child, ' + g.age + ')' : ' (' + g.idType + ')')).join('; ')
+      others.map(g => g.name + (g.kind === 'Child' ? ' (child, ' + g.age + ')' : ' (' + g.idType + ')')).join('; '),
+      CONSENT_VERSION
     ];
     others.forEach((g, i) => {
       appendObj_(GUESTS, GUEST_HEADERS, {
