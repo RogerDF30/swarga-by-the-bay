@@ -458,7 +458,7 @@
         cands.map(x => '<option value="' + esc(x['Booking ID']) + '">' + esc(x['Booking ID'] + ' · ' + niceDate(x['Check-in Date']) + ' → ' + niceDate(x['Check-out Date']) + ' · ' + x.Status) + '</option>').join('') + '</select></label>') +
       '<div class="room-chk-list" id="raRooms">' + db.rooms.filter(r => r.Status === 'Active').map(r =>
         '<label class="room-chk" data-id="' + esc(r['Room ID']) + '"><input type="checkbox" value="' + esc(r['Room ID']) + '"' + (b && roomIds(b['Room IDs']).indexOf(r['Room ID']) > -1 ? ' checked' : '') + '>' +
-        '<span><b>' + esc(r.Name) + '</b><small>' + esc([r.Type, 'Sleeps ' + (r.Capacity || '?'), inr(r.Rate) + '/night'].filter(Boolean).join(' · ')) + '</small><em class="avail"></em></span></label>').join('') + '</div>' +
+        '<span><b>' + esc(r.Name) + '</b><small>' + esc(roomMeta(r, true)) + '</small><em class="avail"></em></span></label>').join('') + '</div>' +
       '<p id="raWarn" class="form-warn hidden"></p>' +
       '<div class="veh-actions"><button type="button" class="chip-btn dark" id="raCancel">Cancel</button><button type="button" class="btn btn-sea" id="raSave">Save room</button></div>';
     raRecalc();
@@ -643,6 +643,7 @@
   const bIn = (b) => isoDate(b['Check-in Date']), bOut = (b) => isoDate(b['Check-out Date']);
   const roomById = (id) => db.rooms.find(r => r['Room ID'] === id);
   const roomIds = (v) => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+  const roomMeta = (r, withRate) => [r.Type, r.Capacity ? 'Sleeps ' + r.Capacity : '', withRate && r.Rate !== '' && r.Rate != null ? inr(r.Rate) + '/night' : ''].filter(Boolean).join(' · ');
   function roomNames(v) { return roomIds(v).map(id => (roomById(id) || {}).Name || id).join(', '); }
   const balanceOf = (b) => num(b.Total) - num(b.Paid);
   const today = () => db.today || todayIso;
@@ -949,7 +950,7 @@
       '<h3 class="mini">Rooms <small id="bfNights"></small></h3>' +
       (db.rooms.length ? '<div id="bfRooms" class="room-chk-list">' + db.rooms.map(r =>
         '<label class="room-chk" data-id="' + esc(r['Room ID']) + '"><input type="checkbox" value="' + esc(r['Room ID']) + '"' + (picked.indexOf(r['Room ID']) > -1 ? ' checked' : '') + '>' +
-        '<span><b>' + esc(r.Name) + '</b><small>' + esc([r.Type, 'Sleeps ' + (r.Capacity || '?'), inr(r.Rate) + '/night'].filter(Boolean).join(' · ')) + '</small><em class="avail"></em></span></label>').join('') + '</div>'
+        '<span><b>' + esc(r.Name) + '</b><small>' + esc(roomMeta(r, true)) + '</small><em class="avail"></em></span></label>').join('') + '</div>'
         : '<p class="fine">No rooms set up yet. Add rooms in the Rooms section, or save without a room.</p>') +
       '<div class="form-grid">' +
       '<label class="lbl">Room charges (₹)<input id="bfCharges" inputmode="decimal" class="sel" value="' + (isNew ? '' : esc(num(b['Room Charges']))) + '"></label>' +
@@ -1032,8 +1033,9 @@
       return '<button type="button" class="room-card" data-rid="' + esc(r['Room ID']) + '">' +
         (cover ? '<span class="rc-img">' + imgTag(cover, r.Name) + '</span>' : '<span class="rc-img empty">📷 Add photos</span>') +
         '<span class="rc-top"><strong>' + esc(r.Name) + '</strong><span class="badge rs-' + slug(r.Status) + '">' + esc(r.Status) + '</span></span>' +
-        '<small>' + esc([r.Type, 'Sleeps ' + (r.Capacity || '?')].filter(Boolean).join(' · ')) + '</small>' +
-        '<b class="rc-rate">' + inr(r.Rate) + '<small>/night</small></b>' +
+        '<small>' + esc(roomMeta(r, false) || 'No details yet') + '</small>' +
+        (r.Rate !== '' && r.Rate != null ? '<b class="rc-rate">' + inr(r.Rate) + '<small>/night</small></b>' : '<b class="rc-rate"><small>No rate set</small></b>') +
+        (r['Show in Booking'] === 'No' ? '<span class="flag muted">Hidden from booking</span>' : '') +
         '<span class="rc-now">' + (occ ? '🟢 In house: ' + esc(occ['Guest Name']) + ' until ' + esc(niceDate(occ['Check-out Date'])) : next ? '📅 Next: ' + esc(next['Guest Name']) + ' · ' + esc(niceDate(next['Check-in Date'])) : '✨ Free') + '</span></button>';
     }).join('') : '<div class="empty"><span>🛏️</span><p>No rooms yet. Add your first room.</p></div>';
     hydratePhotos($('#roomCards'));
@@ -1074,16 +1076,17 @@
     editRoomId = r['Room ID'] || '';
     const body =
       '<div class="form-grid">' +
-      '<div class="field full"><input id="rfName" maxlength="60" placeholder=" " value="' + esc(r.Name || '') + '"><label for="rfName">Room name (e.g. Sea View Suite)</label></div>' +
-      '<div class="field"><input id="rfType" maxlength="40" placeholder=" " value="' + esc(r.Type || '') + '"><label for="rfType">Type (e.g. Double, Family)</label></div>' +
+      '<div class="field full"><input id="rfName" maxlength="60" placeholder=" " value="' + esc(r.Name || '') + '"><label for="rfName">Room name (required)</label></div>' +
+      '<div class="field"><input id="rfType" maxlength="40" placeholder=" " value="' + esc(r.Type || '') + '"><label for="rfType">Type (optional)</label></div>' +
       '<label class="lbl">Status<select id="rfStatus" class="sel">' + opts(['Active', 'Maintenance', 'Inactive'], r.Status || 'Active') + '</select></label>' +
-      '<label class="lbl">Sleeps<input id="rfCap" type="number" min="1" max="30" class="sel" value="' + esc(r.Capacity || 2) + '"></label>' +
-      '<label class="lbl">Rate per night (₹)<input id="rfRate" inputmode="decimal" class="sel" value="' + esc(num(r.Rate) || '') + '"></label>' +
-      '<label class="lbl">Display order<input id="rfSort" type="number" min="0" class="sel" value="' + esc(r.Sort || '') + '"></label>' +
+      '<label class="lbl">Sleeps (optional)<input id="rfCap" type="number" min="1" max="30" class="sel" value="' + esc(r.Capacity || '') + '"></label>' +
+      '<label class="lbl">Rate per night (₹, optional)<input id="rfRate" inputmode="decimal" class="sel" value="' + esc(num(r.Rate) || '') + '"></label>' +
+      '<label class="lbl">Display order (optional)<input id="rfSort" type="number" min="0" class="sel" value="' + esc(r.Sort || '') + '"></label>' +
       '</div>' +
-      '<div class="field"><textarea id="rfDesc" rows="2" maxlength="300" placeholder=" ">' + esc(r.Description || '') + '</textarea><label for="rfDesc">Description (shown to guests)</label></div>' +
-      '<div class="field"><textarea id="rfNotes" rows="2" maxlength="300" placeholder=" ">' + esc(r['Internal Notes'] || '') + '</textarea><label for="rfNotes">Internal notes</label></div>' +
-      '<p class="fine">Only <b>Active</b> rooms appear on the booking page. Maintenance or Inactive rooms stay out of availability.</p>' +
+      '<div class="field"><textarea id="rfDesc" rows="2" maxlength="300" placeholder=" ">' + esc(r.Description || '') + '</textarea><label for="rfDesc">Description (optional, shown to guests)</label></div>' +
+      '<div class="field"><textarea id="rfNotes" rows="2" maxlength="300" placeholder=" ">' + esc(r['Internal Notes'] || '') + '</textarea><label for="rfNotes">Internal notes (optional)</label></div>' +
+      '<label class="toggle-line"><span class="switch"><input type="checkbox" id="rfShow"' + (r['Show in Booking'] === 'No' ? '' : ' checked') + '><span></span></span><span><b>Show in booking</b><small>On: guests can see and pick this room on the booking page. Off: hidden from guests; staff allocate it at check-in.</small></span></label>' +
+      '<p class="fine">Maintenance or Inactive rooms are never offered, to guests or staff.</p>' +
       '<h3 class="mini">Photos <small>up to 6 · the first is the cover</small></h3>' +
       (editRoomId ? '<div id="rfPhotos" class="ph-grid"></div><label class="chip-btn dark ph-add"><input type="file" id="rfPhotoIn" accept="image/jpeg,image/png,image/webp" multiple hidden>+ Add photos</label>'
         : '<p class="fine">Save the room first, then add photos.</p>') +
@@ -1094,7 +1097,7 @@
     if (editRoomId) renderRoomPhotos();
   }
   function saveRoomForm(btn) {
-    const data = { id: editRoomId, name: $('#rfName').value, type: $('#rfType').value, status: $('#rfStatus').value, capacity: $('#rfCap').value, rate: $('#rfRate').value, sort: $('#rfSort').value, description: $('#rfDesc').value, notes: $('#rfNotes').value };
+    const data = { id: editRoomId, name: $('#rfName').value, type: $('#rfType').value, status: $('#rfStatus').value, capacity: $('#rfCap').value, rate: $('#rfRate').value, sort: $('#rfSort').value, description: $('#rfDesc').value, notes: $('#rfNotes').value, showInBooking: $('#rfShow').checked };
     if (!data.name.trim()) return toast('Enter a room name.');
     return busy(btn, async () => {
       const res = await call('saveRoom', { data });

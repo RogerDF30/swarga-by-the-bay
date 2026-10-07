@@ -665,3 +665,7 @@ body.adm:not(.is-super) .super-only { display: none; }
 .danger-link { color: #b3261e !important; }
 #othersBlock #gAdd { margin-top: 10px; }
 .time-chip.fixed { cursor: default; border-style: solid; background: var(--foam); } .time-chip.fixed:hover { border-color: var(--line); }
+
+.toggle-line { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; margin: 12px 0; cursor: pointer; }
+.toggle-line > span:last-child { display: grid; gap: 2px; }
+.toggle-line small { color: var(--muted); font-size: .8rem; }

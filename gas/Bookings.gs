@@ -19,7 +19,7 @@ const BOOKING_HEADERS = [
   'Special Requests', 'Internal Notes', 'Check-in Ref',
   'Cancel Reason', 'Updated At', 'Updated By'
 ];
-const ROOM_HEADERS = ['Room ID', 'Name', 'Type', 'Capacity', 'Rate', 'Status', 'Description', 'Internal Notes', 'Sort', 'Photos'];
+const ROOM_HEADERS = ['Room ID', 'Name', 'Type', 'Capacity', 'Rate', 'Status', 'Description', 'Internal Notes', 'Sort', 'Photos', 'Show in Booking'];
 const PAYMENT_HEADERS = ['Payment ID', 'Booking ID', 'Recorded At', 'Kind', 'Amount', 'Mode', 'Reference', 'Note', 'Recorded By'];
 
 const BLOCKING = ['Confirmed', 'Checked in'];
@@ -81,12 +81,14 @@ function isoOk_(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
 function nightsOf_(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5); }
 function money_(v) { const n = Number(String(v || '0').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : Math.round(n * 100) / 100; }
 function roomList_(v) { return (Array.isArray(v) ? v : String(v || '').split(',')).map(x => String(x).trim()).filter(Boolean); }
+/** Guest-facing: Active and not hidden from the booking page (blank = shown, for rooms created before the toggle). */
+function bookable_(r) { return r.Status === 'Active' && r['Show in Booking'] !== 'No'; }
 function todayIso_() { return Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd'); }
 
 /* ---------- rooms ---------- */
 
 function publicRooms_() {
-  const rooms = readAll_(ROOMS, ROOM_HEADERS).filter(r => r.Status === 'Active')
+  const rooms = readAll_(ROOMS, ROOM_HEADERS).filter(bookable_)
     .sort((a, b) => (Number(a.Sort) || 99) - (Number(b.Sort) || 99))
     .map(r => ({ id: r['Room ID'], name: r.Name, type: r.Type, capacity: Number(r.Capacity) || 0, rate: money_(r.Rate), description: r.Description, photos: photoList_(r.Photos).map(photoRef_) }));
   return { ok: true, rooms: rooms };
@@ -97,16 +99,17 @@ function saveRoom_(d, sess) {
   if (!name) throw new Error('Room name is required.');
   const status = ['Active', 'Maintenance', 'Inactive'].indexOf(d.status) > -1 ? d.status : 'Active';
   const fields = {
-    'Name': name, 'Type': clean_(d.type), 'Capacity': Math.max(1, num_(d.capacity) || 1),
-    'Rate': money_(d.rate), 'Status': status, 'Description': clean_(d.description),
-    'Internal Notes': clean_(d.notes), 'Sort': num_(d.sort)
+    'Name': name, 'Type': clean_(d.type), 'Capacity': num_(d.capacity) || '',
+    'Rate': String(d.rate == null ? '' : d.rate).trim() === '' ? '' : money_(d.rate), 'Status': status, 'Description': clean_(d.description),
+    'Internal Notes': clean_(d.notes), 'Sort': String(d.sort == null ? '' : d.sort).trim() === '' ? '' : num_(d.sort),
+    'Show in Booking': d.showInBooking === false ? 'No' : 'Yes'
   };
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     if (d.id) {
       const r = findBy_(ROOMS, ROOM_HEADERS, d.id);
       writeFields_(ROOMS, ROOM_HEADERS, r._row, fields);
-      audit_(sess, 'room.update', d.id, name + ' · ' + status);
+      audit_(sess, 'room.update', d.id, name + ' · ' + status + ' · booking page ' + (fields['Show in Booking'] === 'Yes' ? 'shown' : 'hidden'));
       return { ok: true, id: d.id };
     }
     const id = 'R' + String(readAll_(ROOMS, ROOM_HEADERS).length + 1).padStart(2, '0') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
@@ -131,7 +134,7 @@ function conflicts_(rooms, from, to, ignoreId) {
 
 function availability_(from, to) {
   if (!isoOk_(from) || !isoOk_(to) || to <= from) throw new Error('Choose valid dates.');
-  const active = readAll_(ROOMS, ROOM_HEADERS).filter(r => r.Status === 'Active').map(r => r['Room ID']);
+  const active = readAll_(ROOMS, ROOM_HEADERS).filter(bookable_).map(r => r['Room ID']);
   const busy = {};
   readAll_(BOOKINGS, BOOKING_HEADERS).forEach(b => {
     if (BLOCKING.indexOf(b.Status) > -1 && overlaps_(from, to, b['Check-in Date'], b['Check-out Date'])) {
@@ -171,7 +174,7 @@ function requestBooking_(d) {
   if (n >= 3) throw new Error('Too many requests from this number. Please call us instead.');
   cache.put(key, String(n + 1), 3600);
 
-  const active = readAll_(ROOMS, ROOM_HEADERS).filter(r => r.Status === 'Active').map(r => r['Room ID']);
+  const active = readAll_(ROOMS, ROOM_HEADERS).filter(bookable_).map(r => r['Room ID']);
   const rooms = roomList_(d.rooms).filter(r => active.indexOf(r) > -1);
   const nights = nightsOf_(d.checkIn, d.checkOut);
   const charges = priceFor_(rooms, nights);
@@ -248,8 +251,9 @@ function bookingStatus_(id, status, reason, sess, notifyGuest) {
     const b = findBy_(BOOKINGS, BOOKING_HEADERS, id);
     const rooms = roomList_(b['Room IDs']);
     if (status === 'Confirmed' || status === 'Checked in') {
-      const activeCount = readAll_(ROOMS, ROOM_HEADERS).filter(r => r.Status === 'Active').length;
-      if (activeCount && !rooms.length) throw new Error('Assign a room before confirming.');
+      // Rooms are optional when every room is hidden from the booking page (assigned at check-in instead).
+      const bookableCount = readAll_(ROOMS, ROOM_HEADERS).filter(bookable_).length;
+      if (bookableCount && !rooms.length) throw new Error('Assign a room before confirming.');
       const c = conflicts_(rooms, b['Check-in Date'], b['Check-out Date'], id);
       if (c.length) throw new Error('Room clash with ' + c.map(x => x['Booking ID'] + ' (' + x['Guest Name'] + ')').join(', '));
     }
@@ -481,7 +485,7 @@ function roomPhoto_(fileId, token) {
   fileId = String(fileId || '');
   let staff = false;
   if (token) { try { requireAdmin_(token); staff = true; } catch (e) {} }
-  const owned = readAll_(ROOMS, ROOM_HEADERS).some(r => (staff || r.Status === 'Active') && photoList_(r.Photos).some(p => p === fileId || p === 'p:' + fileId));
+  const owned = readAll_(ROOMS, ROOM_HEADERS).some(r => (staff || bookable_(r)) && photoList_(r.Photos).some(p => p === fileId || p === 'p:' + fileId));
   if (!owned) throw new Error('Photo not found.');
   const blob = DriveApp.getFileById(fileId).getBlob();
   return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
