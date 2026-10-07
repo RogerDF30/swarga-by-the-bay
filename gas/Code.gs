@@ -129,6 +129,7 @@ function doPost(e) {
       verify:         (b, s) => verify_(b.id, s),
       vehicles:       (b, s) => updateVehicles_(b.id, b.count, b.numbers, s),
       stay:           (b, s) => stay_(b.id, b.move, s),
+      allocateRoom:   (b, s) => allocateRoom_(b.id, b.rooms, b.linkBookingId, s),
       data:           (b, s) => Object.assign(adminData_(), { user: { username: s.u, name: s.name, role: s.role } }),
       saveRoom:       (b, s) => saveRoom_(b.data || {}, s),
       addRoomPhoto:   (b, s) => addRoomPhoto_(b.id, b.photo, s),

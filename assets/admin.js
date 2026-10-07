@@ -156,7 +156,7 @@
       if (from && outDate(r) && outDate(r) < from) return false;
       if (to && inDate(r) && inDate(r) > to) return false;
       if (!q) return true;
-      const hay = r.join(' ').toLowerCase();
+      const hay = (r.join(' ') + ' ' + checkinRooms(r)).toLowerCase();
       return hay.includes(q) || (qc.length >= 3 && hay.replace(/[\s\-+()]/g, '').includes(qc));
     });
     if (view === 'arrivals') list.sort((a, b) => inDate(a).localeCompare(inDate(b)));
@@ -174,7 +174,7 @@
       return '<button type="button" class="gcard" style="animation-delay:' + Math.min(i * 30, 400) + 'ms" data-id="' + esc(col(r, 'Submission ID')) + '">' +
         '<span class="avatar">' + esc(initials(col(r, 'Guest Name'))) + '</span>' +
         '<span class="g-main"><strong>' + esc(col(r, 'Guest Name')) + (n > 1 ? ' <em class="ret">↺ ' + n + ' stays</em>' : '') + '</strong><small>' + esc(col(r, 'Submission ID')) + ' · ' + esc(col(r, 'Mobile')) + '</small></span>' +
-        '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + (+col(r, 'Vehicles') ? ' · 🚗 ' + esc(col(r, 'Vehicle Numbers') || col(r, 'Vehicles') + ' (no number)') : '') + '</small></span>' +
+        '<span class="g-stay"><b>' + esc(niceDate(col(r, 'Check-in Date'))) + '</b> → <b>' + esc(niceDate(col(r, 'Check-out Date'))) + '</b><small>' + a + ' adult' + (a === 1 ? '' : 's') + (c ? ' · ' + c + ' child' + (c === 1 ? '' : 'ren') : '') + (checkinRooms(r) ? ' · 🛏️ ' + esc(checkinRooms(r)) : '') + (+col(r, 'Vehicles') ? ' · 🚗 ' + esc(col(r, 'Vehicle Numbers') || col(r, 'Vehicles') + ' (no number)') : '') + '</small></span>' +
         '<span class="g-badges"><span class="badge st-' + st.replace(/\s/g, '') + '">' + esc(st) + '</span>' +
         (fl ? '<span class="flag ' + fl[0] + '">' + fl[1] + '</span>' : '') +
         (col(r, 'Status') !== 'Verified' ? '<span class="flag muted">Unverified</span>' : '') + '</span>' +
@@ -232,6 +232,7 @@
     $('#bookingLinkBlock').innerHTML = bk ? (bObj
       ? '<button type="button" class="hist" data-open-booking="' + esc(bk) + '"><b>' + esc(bk) + ' · ' + esc(bObj.Status) + '</b><small>' + esc(roomNames(bObj['Room IDs']) || 'No room') + ' · ' + esc(bObj['Payment Status']) + '</small></button>'
       : '<p class="fine">' + esc(bk) + ' (booking not found)</p>') : '';
+    renderRoomAlloc(false);
     renderVehicles(false);
     renderOthers();
     $('#idProof').innerHTML = col(current, 'ID Photo File ID')
@@ -430,6 +431,72 @@
       btn.textContent = label;
     }
   }
+
+  /* ---------- room allocation ---------- */
+  const linkedBooking = (r) => { const bk = col(r, 'Booking ID'); return bk && db && db.bookings ? db.bookings.find(b => b['Booking ID'] === bk) : null; };
+  function checkinRooms(r) { const b = linkedBooking(r); return b ? roomNames(b['Room IDs']) : ''; }
+  function linkCandidates() {
+    const k = phoneKey(current);
+    if (!k) return [];
+    return db.bookings.filter(b => !b['Check-in Ref'] && ['Requested', 'Confirmed', 'Checked in'].indexOf(b.Status) > -1 &&
+      String(b.Mobile).replace(/\D/g, '').slice(-10) === k);
+  }
+  function renderRoomAlloc(editing) {
+    const st = stayOf(current), b = linkedBooking(current);
+    const names = b ? roomNames(b['Room IDs']) : '';
+    $('#roomEdit').textContent = names ? 'Change' : 'Allocate';
+    $('#roomEdit').classList.toggle('hidden', editing || st === 'Checked out' || !db.rooms.length);
+    if (!editing) {
+      $('#roomBlock').innerHTML = names
+        ? '<dl><dt>Room</dt><dd><b>' + esc(names) + '</b></dd><dt>Booking</dt><dd>' + esc(b['Booking ID']) + ' · ' + esc(b.Status) + '</dd></dl>'
+        : '<p class="fine">' + (db.rooms.length ? 'No room allocated.' : 'No rooms set up yet. Add rooms in the Rooms section.') + '</p>';
+      return;
+    }
+    const cands = b ? [] : linkCandidates();
+    $('#roomBlock').innerHTML =
+      (b ? '' : '<label class="lbl">Booking<select id="raLink" class="sel"><option value="">New walk-in booking (billed at room rates)</option>' +
+        cands.map(x => '<option value="' + esc(x['Booking ID']) + '">' + esc(x['Booking ID'] + ' · ' + niceDate(x['Check-in Date']) + ' → ' + niceDate(x['Check-out Date']) + ' · ' + x.Status) + '</option>').join('') + '</select></label>') +
+      '<div class="room-chk-list" id="raRooms">' + db.rooms.filter(r => r.Status === 'Active').map(r =>
+        '<label class="room-chk" data-id="' + esc(r['Room ID']) + '"><input type="checkbox" value="' + esc(r['Room ID']) + '"' + (b && roomIds(b['Room IDs']).indexOf(r['Room ID']) > -1 ? ' checked' : '') + '>' +
+        '<span><b>' + esc(r.Name) + '</b><small>' + esc([r.Type, 'Sleeps ' + (r.Capacity || '?'), inr(r.Rate) + '/night'].filter(Boolean).join(' · ')) + '</small><em class="avail"></em></span></label>').join('') + '</div>' +
+      '<p id="raWarn" class="form-warn hidden"></p>' +
+      '<div class="veh-actions"><button type="button" class="chip-btn dark" id="raCancel">Cancel</button><button type="button" class="btn btn-sea" id="raSave">Save room</button></div>';
+    raRecalc();
+  }
+  function raRecalc() {
+    const b = linkedBooking(current) || (($('#raLink') || {}).value ? db.bookings.find(x => x['Booking ID'] === $('#raLink').value) : null);
+    const from = b ? bIn(b) : inDate(current), to = b ? bOut(b) : outDate(current);
+    const ignore = b ? b['Booking ID'] : '';
+    let cap = 0; const clash = [];
+    document.querySelectorAll('#raRooms .room-chk').forEach(l => {
+      const r = roomById(l.dataset.id), other = from && to ? roomBusy(l.dataset.id, from, to, ignore) : null;
+      l.classList.toggle('busy', !!other);
+      l.querySelector('.avail').textContent = other ? 'Booked · ' + other['Guest Name'] : 'Free';
+      if (l.querySelector('input').checked) { cap += num(r && r.Capacity); if (other) clash.push(r.Name + ' (' + other['Guest Name'] + ')'); }
+    });
+    const guests = (+col(current, 'Adults') || 0) + (+col(current, 'Children') || 0);
+    const warns = [];
+    if (!(from && to && to > from)) warns.push('Check-out must be after check-in. Fix the dates with Edit details first.');
+    if (clash.length) warns.push('Room clash: ' + clash.join(', ') + '.');
+    if (cap && guests > cap) warns.push('Selected rooms sleep ' + cap + ' but there are ' + guests + ' guests.');
+    $('#raWarn').textContent = warns.join(' ');
+    $('#raWarn').classList.toggle('hidden', !warns.length);
+  }
+  $('#roomEdit').addEventListener('click', () => renderRoomAlloc(true));
+  $('#roomBlock').addEventListener('change', raRecalc);
+  $('#roomBlock').addEventListener('click', e => {
+    if (e.target.id === 'raCancel') return renderRoomAlloc(false);
+    if (e.target.id !== 'raSave') return;
+    const rooms = [...document.querySelectorAll('#raRooms input:checked')].map(i => i.value);
+    if (!rooms.length) return toast('Choose at least one room.');
+    const linkBookingId = $('#raLink') ? $('#raLink').value : '';
+    return busy(e.target, async () => {
+      const r = await call('allocateRoom', { id: col(current, 'Submission ID'), rooms, linkBookingId });
+      toast('Room allocated · ' + r.bookingId);
+      await quietReload();
+      if (current) openDetail();
+    });
+  });
 
   /* ---------- vehicles (view / edit) ---------- */
   function renderVehicles(editing) {
