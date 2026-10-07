@@ -486,3 +486,85 @@ function roomPhoto_(fileId, token) {
   const blob = DriveApp.getFileById(fileId).getBlob();
   return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }
+
+/* ---------- room allocation from the guest log ---------- */
+
+/**
+ * Allocate rooms to a check-in (Admin and Super admin).
+ * Rooms live on bookings, so occupancy, clash checks and billing stay in one place:
+ *  - check-in already linked to a booking  -> that booking's rooms are replaced
+ *  - linkBookingId given                   -> that unlinked booking is linked, then rooms set
+ *  - neither                               -> a Walk-in booking is created and linked
+ */
+function allocateRoom_(submissionId, roomsIn, linkBookingId, sess) {
+  const allRooms = readAll_(ROOMS, ROOM_HEADERS);
+  const rooms = roomList_(roomsIn).filter((r, i, a) => a.indexOf(r) === i);
+  if (!rooms.length) throw new Error('Choose at least one room.');
+  rooms.forEach(id => {
+    const r = allRooms.filter(x => x['Room ID'] === id)[0];
+    if (!r) throw new Error('Room not found: ' + id);
+    if (r.Status !== 'Active') throw new Error(r.Name + ' is ' + r.Status.toLowerCase() + '.');
+  });
+  const names = rooms.map(id => allRooms.filter(x => x['Room ID'] === id)[0].Name).join(', ');
+
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let bookingId, summary;
+  try {
+    const c = checkinRow_(submissionId), ci = c.obj;
+    const stay = ci['Stay Status'] || 'Expected';
+    if (stay === 'Checked out') throw new Error('Guest has checked out.');
+    const all = readAll_(BOOKINGS, BOOKING_HEADERS);
+    let b = ci['Booking ID'] ? all.filter(x => x['Booking ID'] === ci['Booking ID'])[0] : null;
+
+    if (!b && linkBookingId) {
+      b = all.filter(x => x['Booking ID'] === linkBookingId)[0];
+      if (!b) throw new Error('Booking not found: ' + linkBookingId);
+      if (b['Check-in Ref'] && b['Check-in Ref'] !== submissionId) throw new Error(linkBookingId + ' is linked to another check-in.');
+      if (['Requested', 'Confirmed', 'Checked in'].indexOf(b.Status) === -1) throw new Error(linkBookingId + ' is ' + b.Status.toLowerCase() + '.');
+      writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, { 'Check-in Ref': submissionId });
+      c.sh.getRange(c.row, HEADERS.indexOf('Booking ID') + 1).setValue(linkBookingId);
+    }
+
+    if (b) {
+      if (b.Status === 'Cancelled' || b.Status === 'No-show' || b.Status === 'Checked out') throw new Error('Linked booking ' + b['Booking ID'] + ' is ' + b.Status.toLowerCase() + '.');
+      const clash = conflicts_(rooms, b['Check-in Date'], b['Check-out Date'], b['Booking ID']);
+      if (clash.length) throw new Error('Room clash with ' + clash.map(x => x['Booking ID'] + ' (' + x['Guest Name'] + ')').join(', '));
+      const fields = { 'Room IDs': rooms.join(', '), 'Updated At': stamp_(), 'Updated By': clean_(sess.name) };
+      if (money_(b['Room Charges']) === 0) { // never priced: price from the new rooms
+        const charges = priceFor_(rooms, Number(b.Nights) || nightsOf_(b['Check-in Date'], b['Check-out Date']));
+        fields['Room Charges'] = charges;
+        fields['Total'] = Math.max(0, charges - money_(b.Discount));
+      }
+      writeFields_(BOOKINGS, BOOKING_HEADERS, b._row, fields);
+      bookingId = b['Booking ID'];
+      refreshPaid_(bookingId);
+      summary = (linkBookingId ? 'Linked ' + bookingId + ' · ' : '') + 'Rooms ' + (roomNamesOf_(b['Room IDs'], allRooms) || 'none') + ' → ' + names;
+    } else {
+      const from = ci['Check-in Date'], to = ci['Check-out Date'];
+      if (!isoOk_(from) || !isoOk_(to) || to <= from) throw new Error('Set a check-out date after check-in (Edit details) before allocating a room.');
+      const clash = conflicts_(rooms, from, to, '');
+      if (clash.length) throw new Error('Room clash with ' + clash.map(x => x['Booking ID'] + ' (' + x['Guest Name'] + ')').join(', '));
+      const nights = nightsOf_(from, to), charges = priceFor_(rooms, nights);
+      bookingId = newId_('SBK');
+      appendObj_(BOOKINGS, BOOKING_HEADERS, {
+        'Booking ID': bookingId, 'Created At': stamp_(), 'Source': 'Walk-in',
+        'Status': stay === 'Checked in' ? 'Checked in' : 'Confirmed',
+        'Guest Name': clean_(ci['Guest Name']), 'Mobile': txt_(ci.Mobile), 'Email': clean_(ci.Email),
+        'Adults': num_(ci.Adults), 'Children': num_(ci.Children),
+        'Check-in Date': txt_(from), 'Check-out Date': txt_(to), 'Nights': nights,
+        'Room IDs': rooms.join(', '), 'Room Charges': charges, 'Discount': 0, 'Total': charges,
+        'Paid': 0, 'Payment Status': 'Unpaid', 'Check-in Ref': submissionId,
+        'Updated At': stamp_(), 'Updated By': clean_(sess.name)
+      });
+      c.sh.getRange(c.row, HEADERS.indexOf('Booking ID') + 1).setValue(bookingId);
+      refreshPaid_(bookingId);
+      summary = 'Walk-in booking ' + bookingId + ' created · Rooms ' + names;
+    }
+  } finally { lock.releaseLock(); }
+  audit_(sess, 'checkin.room', submissionId, summary);
+  return { ok: true, bookingId: bookingId };
+}
+
+function roomNamesOf_(ids, allRooms) {
+  return roomList_(ids).map(id => (allRooms.filter(r => r['Room ID'] === id)[0] || {}).Name || id).join(', ');
+}
